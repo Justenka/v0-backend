@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 29, 2025 at 09:18 PM
+-- Generation Time: Nov 29, 2025 at 11:44 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -102,6 +102,13 @@ CREATE TABLE `grupes` (
   `sukurimo_data` date NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `grupes`
+--
+
+INSERT INTO `grupes` (`id_grupe`, `fk_id_vartotojas`, `pavadinimas`, `aprasas`, `sukurimo_data`) VALUES
+(4, 5, 'test', NULL, '2025-11-30');
+
 -- --------------------------------------------------------
 
 --
@@ -111,12 +118,19 @@ CREATE TABLE `grupes` (
 CREATE TABLE `grupes_nariai` (
   `id_grupes_narys` int(11) NOT NULL,
   `fk_id_grupe` int(11) NOT NULL,
-  `fk_id_sistemos_istorija` int(11) NOT NULL,
+  `fk_id_sistemos_istorija` int(11) DEFAULT NULL,
   `fk_id_vartotojas` int(11) NOT NULL,
   `prisijungimo_data` date NOT NULL,
   `role` int(11) NOT NULL,
   `nario_busena` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `grupes_nariai`
+--
+
+INSERT INTO `grupes_nariai` (`id_grupes_narys`, `fk_id_grupe`, `fk_id_sistemos_istorija`, `fk_id_vartotojas`, `prisijungimo_data`, `role`, `nario_busena`) VALUES
+(4, 4, NULL, 5, '0000-00-00', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -479,7 +493,7 @@ CREATE TABLE `vartotojai` (
 --
 
 INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`) VALUES
-(5, 'kazkoks', 'kazkas', 'kazkas@example.com', 'kazkas', '2025-11-28 00:00:00', '2025-11-29 21:56:08', 1);
+(5, 'kazkoks', 'kazkas', 'kazkas@example.com', 'kazkas', '2025-11-28 00:00:00', '2025-11-30 00:30:51', 1);
 
 --
 -- Indexes for dumped tables
@@ -704,13 +718,13 @@ ALTER TABLE `delspinigiai`
 -- AUTO_INCREMENT for table `grupes`
 --
 ALTER TABLE `grupes`
-  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
 --
 ALTER TABLE `grupes_nariai`
-  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `grupes_zinutes`
