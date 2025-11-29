@@ -73,6 +73,66 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.post('/api/groups', async (req, res) => {
+  const { title, description, ownerId } = req.body;
+
+  if (!title || !ownerId) {
+    return res
+      .status(400)
+      .json({ message: 'Reikalingas pavadinimas ir ownerId' });
+  }
+
+  try {
+    console.log('Creating group with body:', req.body);
+
+    const [result] = await db.query(
+      `INSERT INTO Grupes 
+         (pavadinimas, aprasas, sukurimo_data, fk_id_vartotojas)
+       VALUES (?, ?, NOW(), ?)`,
+      [title, description || null, ownerId]
+    );
+
+    const groupId = result.insertId;
+    console.log('New group id:', groupId);
+
+    // 2) Pridedam kūrėją į Grupes_nariai kaip owner/admin
+    await db.query(
+    `INSERT INTO Grupes_nariai 
+        (fk_id_grupe, fk_id_vartotojas, role, nario_busena, fk_id_sistemos_istorija)
+    VALUES (?, ?, ?, ?, NULL)`,
+    [groupId, ownerId, 1, 1]
+    );
+
+    // 3) Parsiunčiam pilną grupės info (kaip groups-by-user)
+    const [rows] = await db.query(
+      `SELECT 
+         g.id_grupe,
+         g.pavadinimas,
+         g.aprasas,
+         g.sukurimo_data,
+         gn.role,
+         gn.nario_busena,
+         v.vardas AS owner_vardas,
+         v.pavarde AS owner_pavarde
+       FROM Grupes_nariai gn
+       JOIN Grupes g ON gn.fk_id_grupe = g.id_grupe
+       JOIN Vartotojai v ON g.fk_id_vartotojas = v.id_vartotojas
+       WHERE gn.fk_id_vartotojas = ? AND g.id_grupe = ?`,
+      [ownerId, groupId]
+    );
+
+    const group = rows[0];
+
+    res.status(201).json(group);
+  } catch (err) {
+    console.error('Create group error:', err);
+    //kad frontend matytų realią SQL klaidą (kol debugini)
+    const message =
+      err.sqlMessage || err.message || 'Nepavyko sukurti grupės';
+    res.status(500).json({ message });
+  }
+});
+
 // ------------------------------------------
 // Gauti VISAS grupes (admin/overview variantas)
 // ------------------------------------------
@@ -84,7 +144,6 @@ app.get('/api/groups', async (req, res) => {
          g.pavadinimas,
          g.aprasas,
          g.sukurimo_data,
-         g.privatumo_lygis,
          g.fk_id_vartotojas AS owner_id,
          v.vardas AS owner_vardas,
          v.pavarde AS owner_pavarde
