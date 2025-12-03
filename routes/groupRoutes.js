@@ -124,67 +124,6 @@ router.get('/api/groups-by-user/:userId', async (req, res) => {
   }
 });
 
-// GET /api/groups/:id – grąžina grupę + narius + SKOLAS (išlaidas)
-router.get('/api/groups/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    // 1. Grupės info
-    const [groupRows] = await db.query(
-      `SELECT g.*, v.vardas AS owner_vardas, v.pavarde AS owner_pavarde
-       FROM Grupes g
-       JOIN Vartotojai v ON g.fk_id_vartotojas = v.id_vartotojas
-       WHERE g.id_grupe = ?`, [id]
-    );
-
-    if (groupRows.length === 0) {
-      return res.status(404).json({ message: "Grupė nerasta" });
-    }
-
-    // 2. Nariai
-    const [memberRows] = await db.query(
-      `SELECT v.id_vartotojas AS id, v.vardas AS name, gn.role
-       FROM Grupes_nariai gn
-       JOIN Vartotojai v ON gn.fk_id_vartotojas = v.id_vartotojas
-       WHERE gn.fk_id_grupe = ?`, [id]
-    );
-
-    // 3. VISOS SKOLOS (išlaidos)
-    const [debtsRows] = await db.query(
-      `SELECT 
-         s.id_skola AS id,
-         s.pavadinimas AS title,
-         s.suma AS amount,
-         s.sukurimo_data AS createdAt,
-         s.valiutos_kodas,
-         v.vardas AS paidByName
-       FROM Skolos s
-       JOIN Vartotojai v ON s.fk_id_vartotojas = v.id_vartotojas
-       WHERE s.fk_id_grupe = ?
-       ORDER BY s.sukurimo_data DESC`, [id]
-    );
-
-    res.json({
-      ...groupRows[0],
-      members: memberRows.map(m => ({
-        id: m.id,
-        name: m.name,
-        role: m.role === 1 ? "admin" : "member"
-      })),
-      debts: debtsRows.map(d => ({
-        id: d.id,
-        title: d.title,
-        amount: Number(d.amount),
-        currency: d.valiutos_kodas === 1 ? "EUR" : d.valiutos_kodas === 2 ? "USD" : "PLN",
-        paidBy: d.paidByName,
-        createdAt: d.createdAt
-      }))
-    });
-  } catch (err) {
-    console.error('Klaida gaunant grupę:', err);
-    res.status(500).json({ message: 'Serverio klaida' });
-  }
-});
 
 // GET /api/groups/:id – pilna grupė su nariais
 router.get('/api/groups/:id', async (req, res) => {
@@ -232,6 +171,29 @@ router.get('/api/groups/:id', async (req, res) => {
   } catch (err) {
     console.error('Klaida gaunant grupę:', err)
     res.status(500).json({ message: 'Serverio klaida' })
+  }
+});
+
+router.get('/api/debt-parts/:debtId', async (req, res) => {
+  const { debtId } = req.params;
+  try {
+    const [rows] = await db.query(
+      `SELECT 
+         sd.id_skolos_dalis,
+         sd.suma,
+         sd.procentas,
+         sd.vaidmuo,
+         v.vardas,
+         v.pavarde
+       FROM Skolos_dalys sd
+       JOIN Vartotojai v ON sd.fk_id_vartotojas = v.id_vartotojas
+       WHERE sd.fk_id_skola = ?`,
+      [debtId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Get debt parts error:', err);
+    res.status(500).json({ message: 'Serverio klaida' });
   }
 });
 
