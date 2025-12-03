@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 29, 2025 at 11:44 PM
+-- Generation Time: Dec 03, 2025 at 02:40 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -102,13 +102,6 @@ CREATE TABLE `grupes` (
   `sukurimo_data` date NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `grupes`
---
-
-INSERT INTO `grupes` (`id_grupe`, `fk_id_vartotojas`, `pavadinimas`, `aprasas`, `sukurimo_data`) VALUES
-(4, 5, 'test', NULL, '2025-11-30');
-
 -- --------------------------------------------------------
 
 --
@@ -124,13 +117,6 @@ CREATE TABLE `grupes_nariai` (
   `role` int(11) NOT NULL,
   `nario_busena` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `grupes_nariai`
---
-
-INSERT INTO `grupes_nariai` (`id_grupes_narys`, `fk_id_grupe`, `fk_id_sistemos_istorija`, `fk_id_vartotojas`, `prisijungimo_data`, `role`, `nario_busena`) VALUES
-(4, 4, NULL, 5, '0000-00-00', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -493,7 +479,7 @@ CREATE TABLE `vartotojai` (
 --
 
 INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`) VALUES
-(5, 'kazkoks', 'kazkas', 'kazkas@example.com', 'kazkas', '2025-11-28 00:00:00', '2025-11-30 00:30:51', 1);
+(8, 'KAZKAS', 'KAZKAS', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-03 15:40:21', 1);
 
 --
 -- Indexes for dumped tables
@@ -718,7 +704,7 @@ ALTER TABLE `delspinigiai`
 -- AUTO_INCREMENT for table `grupes`
 --
 ALTER TABLE `grupes`
-  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
@@ -802,13 +788,13 @@ ALTER TABLE `sistemos_istorijos`
 -- AUTO_INCREMENT for table `skolos`
 --
 ALTER TABLE `skolos`
-  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `skolos_dalys`
 --
 ALTER TABLE `skolos_dalys`
-  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `skolu_statusai`
@@ -838,7 +824,7 @@ ALTER TABLE `valiutos`
 -- AUTO_INCREMENT for table `vartotojai`
 --
 ALTER TABLE `vartotojai`
-  MODIFY `id_vartotojas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_vartotojas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- Constraints for dumped tables
