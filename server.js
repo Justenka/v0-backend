@@ -8,6 +8,7 @@ const groupRoutes = require('./routes/groupRoutes');
 const debtRoutes = require('./routes/debtRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const friendsRoutes = require("./routes/friendsRoutes");
+const messagesRoutes = require("./routes/messagesRoutes")
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -27,6 +28,7 @@ app.use(groupRoutes);
 app.use(debtRoutes);
 app.use(categoryRoutes);
 app.use(friendsRoutes);
+app.use(messagesRoutes)
 
 // Globalus klaidų handleris (nebūtina, bet faina turėti)
 app.use((err, req, res, next) => {
