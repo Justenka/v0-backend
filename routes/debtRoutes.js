@@ -343,4 +343,68 @@ router.get('/api/categories-by-group/:groupId', async (req, res) => {
     res.status(500).json({ message: 'Serverio klaida' });
   }
 });
+
+// ------------------------------------------
+// Ištrinti skolą (išlaidą)
+// ------------------------------------------
+router.delete('/api/debts/:debtId', async (req, res) => {
+  const { debtId } = req.params;
+  
+  // Gauname userId iš užklausos - galite naudoti authMiddleware arba siųsti per body/header
+  // Šiuo atveju tikriname per header'į arba query parametrą
+  const userId = req.headers['x-user-id'] || req.query.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Neautorizuotas - userId nėra' });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Gauname skolos info + kas mokėjo + grupę
+    const [debtRows] = await connection.query(
+      `SELECT s.fk_id_vartotojas AS paidById, s.fk_id_grupe AS groupId
+       FROM Skolos s
+       WHERE s.id_skola = ?`,
+      [debtId]
+    );
+
+    if (debtRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'Skola nerasta' });
+    }
+
+    const { paidById, groupId } = debtRows[0];
+
+    // 2. Patikriname ar vartotojas yra adminas grupėje
+    const [adminRows] = await connection.query(
+      `SELECT role FROM Grupes_nariai 
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
+      [groupId, userId]
+    );
+
+    const isAdmin = adminRows.length > 0 && adminRows[0].role === 1; // 1 = admin
+    const isPayer = Number(paidById) === Number(userId);
+
+    if (!isAdmin && !isPayer) {
+      await connection.rollback();
+      return res.status(403).json({ message: 'Neturite teisės ištrinti šios išlaidos' });
+    }
+
+    // 3. Triname susijusias dalis ir pačią skolą
+    await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
+    await connection.query(`DELETE FROM Skolos WHERE id_skola = ?`, [debtId]);
+
+    await connection.commit();
+    res.json({ message: 'Išlaida sėkmingai ištrinta' });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Klaida trinant skolą:', err);
+    res.status(500).json({ message: 'Serverio klaida' });
+  } finally {
+    connection.release();
+  }
+});
+
 module.exports = router;
