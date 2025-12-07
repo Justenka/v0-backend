@@ -265,15 +265,30 @@ router.post('/api/debts', async (req, res) => {
         today,
         termDateStr,
         valiutos_kodas,
-        kategorijaId  // *** NAUDOJAME PATIKRINTĄ REIKŠMĘ ***
+        kategorijaId
       ]
     );
 
     const debtId = debtResult.insertId;
 
-    // 2. Sukuriame skolos dalis
+    // 2. Sukuriame skolos dalis - su procentų konvertavimu į sumą
     for (const split of splits) {
       const role = Number(split.userId) === Number(paidByUserId) ? 2 : 1;
+      
+      // *** NAUJAS LOGIKA: Apskaičiuojame sumą pagal procentus ***
+      let splitAmount = split.amount || 0;
+      let splitPercentage = split.percentage || 0;
+      
+      // Jei pateiktas procentas bet nėra sumos, apskaičiuojame sumą
+      if (splitPercentage > 0 && splitAmount === 0) {
+        splitAmount = (amount * splitPercentage) / 100;
+        console.log(`Apskaičiuota suma iš ${splitPercentage}%: ${splitAmount}`);
+      }
+      // Jei pateikta suma bet nėra procento, apskaičiuojame procentą
+      else if (splitAmount > 0 && splitPercentage === 0) {
+        splitPercentage = (splitAmount / amount) * 100;
+        console.log(`Apskaičiuotas procentas iš ${splitAmount}: ${splitPercentage}%`);
+      }
       
       await connection.query(
         `INSERT INTO Skolos_dalys 
@@ -282,8 +297,8 @@ router.post('/api/debts', async (req, res) => {
         [
           debtId,
           split.userId,
-          split.amount || 0,
-          split.percentage || 0,
+          splitAmount,
+          splitPercentage,
           lateFeeAmount > 0 ? 1 : 0,
           role
         ]
