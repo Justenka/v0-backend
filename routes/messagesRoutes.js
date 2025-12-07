@@ -4,7 +4,7 @@ const db = require("../db")
 
 const router = express.Router()
 
-// helper – ar dviese yra draugai (Vartotoju_draugystes turi būti kaip darėm anksčiau)
+// helper – ar dviese yra draugai
 async function areFriends(userId, friendId) {
   const [rows] = await db.query(
     `
@@ -59,14 +59,14 @@ router.get("/api/messages", async (req, res) => {
       [userId, friendId, friendId, userId],
     )
 
-    // prielaida: pranesimo_busena = 0 → neperskaitytas, !=0 → perskaitytas
+    // pranesimo_busena: 0 = neperskaitytas, 1 = perskaitytas
     const messages = rows.map((m) => ({
       id: m.id_asmeninis_pranesimas,
       senderId: m.fk_id_vartotojas_siuntejas.toString(),
       recipientId: m.fk_id_vartotojas_gavejas.toString(),
       content: m.turinys,
-      timestamp: m.data, // 'YYYY-MM-DD', frontende paversim į Date
-      read: m.pranesimo_busena !== 0,
+      timestamp: m.data,    
+      read: m.pranesimo_busena, 
     }))
 
     return res.json({ messages })
@@ -100,7 +100,7 @@ router.post("/api/messages", async (req, res) => {
         .json({ message: "Negalite rašyti vartotojui, kuris nėra jūsų draugas" })
     }
 
-    // nauja žinutė: data = šiandien, pranesimo_busena = 0 (neperskaityta)
+    // nauja žinutė: pranesimo_busena = 0 (neperskaityta)
     const [result] = await db.query(
       `
       INSERT INTO asmeniniai_pranesimai
@@ -136,12 +136,40 @@ router.post("/api/messages", async (req, res) => {
         recipientId: m.fk_id_vartotojas_gavejas.toString(),
         content: m.turinys,
         timestamp: m.data,
-        read: m.pranesimo_busena !== 0,
+        read: m.pranesimo_busena, // 0
       },
     })
   } catch (err) {
     console.error("Create message error:", err)
     return res.status(500).json({ message: "Serverio klaida siunčiant žinutę" })
+  }
+})
+
+router.post("/api/messages/mark-read", async (req, res) => {
+  try {
+    const { userId, friendId } = req.body
+    const uId = Number(userId)
+    const fId = Number(friendId)
+
+    if (!uId || !fId) {
+      return res.status(400).json({ message: "Trūksta userId arba friendId" })
+    }
+
+    await db.query(
+      `
+      UPDATE asmeniniai_pranesimai
+      SET pranesimo_busena = 1
+      WHERE fk_id_vartotojas_gavejas = ?
+        AND fk_id_vartotojas_siuntejas = ?
+        AND pranesimo_busena = 0
+      `,
+      [uId, fId],
+    )
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error("mark-read error:", err)
+    return res.status(500).json({ message: "Serverio klaida žymint perskaitytą" })
   }
 })
 
