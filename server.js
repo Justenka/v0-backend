@@ -14,8 +14,17 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL
+
+const corsOptions = {
+  origin: allowedOrigin,
+  credentials: true, // LEIDŽIAM cookies / credentials
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
+
+app.use(cors(corsOptions))
+app.use(express.json())
 
 // Health check (gali palikti čia, nes paprasta)
 app.get('/api/health', (req, res) => {

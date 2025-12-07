@@ -197,6 +197,122 @@ router.get('/api/debt-parts/:debtId', async (req, res) => {
   }
 });
 
-// ... čia perkelk IR POST/PUT/DELETE maršrutus susijusius su grupėmis ...
+// ==================================================================
+// GRUPIŲ ŽINUTĖS
+// ==================================================================
+
+// GET /api/groups/:groupId/messages  – visos grupės žinutės
+router.get('/api/groups/:groupId/messages', async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        gz.id_grupes_zinute         AS id,
+        gz.fk_id_grupe              AS groupId,
+        gz.fk_id_grupes_narys       AS groupMemberId,
+        v.id_vartotojas             AS senderId,
+        CONCAT(v.vardas, ' ', v.pavarde) AS senderName,
+        gz.turinys                  AS content,
+        gz.siuntimo_data            AS sentAt,
+        gz.redaguota                AS edited,
+        gz.redagavimo_data          AS editedAt,
+        gz.istrinta                 AS deleted
+      FROM grupes_zinutes gz
+      JOIN Grupes_nariai gn ON gn.id_grupes_narys = gz.fk_id_grupes_narys
+      JOIN Vartotojai v     ON v.id_vartotojas    = gn.fk_id_vartotojas
+      WHERE gz.fk_id_grupe = ?
+        AND gz.istrinta = 0
+      ORDER BY gz.siuntimo_data ASC
+      `,
+      [groupId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Get group messages error:', err);
+    res.status(500).json({ message: 'Nepavyko nuskaityti žinučių' });
+  }
+});
+
+// POST /api/groups/:groupId/messages – sukurti naują žinutę
+router.post('/api/groups/:groupId/messages', async (req, res) => {
+  const { groupId } = req.params;
+  const { senderId, content } = req.body; 
+  // vėliau senderId galėsi imti iš JWT / auth middleware
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ message: 'Tuščia žinutė' });
+  }
+  if (!senderId) {
+    return res.status(400).json({ message: 'Trūksta siuntėjo (senderId)' });
+  }
+
+  try {
+    // 1) Surandam, ar šis vartotojas yra grupės narys
+    const [memberRows] = await db.query(
+      `
+      SELECT id_grupes_narys
+      FROM Grupes_nariai
+      WHERE fk_id_grupe = ?
+        AND fk_id_vartotojas = ?
+      LIMIT 1
+      `,
+      [groupId, senderId]
+    );
+
+    if (memberRows.length === 0) {
+      return res
+        .status(403)
+        .json({ message: 'Vartotojas nėra šios grupės narys' });
+    }
+
+    const groupMemberId = memberRows[0].id_grupes_narys;
+
+    // 2) Įrašom žinutę į grupes_zinutes
+    // redaguota = 0, istrinta = 0, redagavimo_data dabar = NOW()
+    const [insertResult] = await db.query(
+      `
+      INSERT INTO grupes_zinutes
+        (fk_id_grupes_narys, fk_id_grupe, turinys, siuntimo_data, redaguota, redagavimo_data, istrinta)
+      VALUES (?, ?, ?, NOW(), 0, NOW(), 0)
+      `,
+      [groupMemberId, groupId, content.trim()]
+    );
+
+    const insertId = insertResult.insertId;
+
+    // 3) Parsiunčiam pilną įrašą su vardu/pavarde
+    const [rows] = await db.query(
+      `
+      SELECT 
+        gz.id_grupes_zinute         AS id,
+        gz.fk_id_grupe              AS groupId,
+        gz.fk_id_grupes_narys       AS groupMemberId,
+        v.id_vartotojas             AS senderId,
+        CONCAT(v.vardas, ' ', v.pavarde) AS senderName,
+        gz.turinys                  AS content,
+        gz.siuntimo_data            AS sentAt,
+        gz.redaguota                AS edited,
+        gz.redagavimo_data          AS editedAt,
+        gz.istrinta                 AS deleted
+      FROM grupes_zinutes gz
+      JOIN Grupes_nariai gn ON gn.id_grupes_narys = gz.fk_id_grupes_narys
+      JOIN Vartotojai v     ON v.id_vartotojas    = gn.fk_id_vartotojas
+      WHERE gz.id_grupes_zinute = ?
+      LIMIT 1
+      `,
+      [insertId]
+    );
+
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Create group message error:', err);
+    const message =
+      err.sqlMessage || err.message || 'Nepavyko išsaugoti žinutės';
+    res.status(500).json({ message });
+  }
+});
 
 module.exports = router;
