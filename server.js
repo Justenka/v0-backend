@@ -20,7 +20,7 @@ const corsOptions = {
   origin: allowedOrigin,
   credentials: true, // LEIDŽIAM cookies / credentials
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'x-user-id','Authorization'],
 }
 
 app.use(cors(corsOptions))
