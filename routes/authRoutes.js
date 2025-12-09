@@ -1,13 +1,14 @@
 const express = require("express")
 const crypto = require("crypto")
-const db = require("../db") // čia tavo mysql2 pool (PromisePool)
+const db = require("../db")
+const path = require("path")
+const multer = require("multer")
 
 const { OAuth2Client } = require("google-auth-library")
 const jwt = require("jsonwebtoken")
 
 const router = express.Router()
 
-// Pagalbinė funkcija SHA-256 hashui gauti
 function hashPassword(password) {
   return crypto.createHash("sha256").update(password).digest("hex")
 }
@@ -43,13 +44,14 @@ router.post("/api/login", async (req, res) => {
 
     const [rows] = await db.query(
       `SELECT 
-         id_vartotojas,
-         vardas,
-         pavarde,
-         el_pastas,
-         valiutos_kodas,
-         sukurimo_data,
-         paskutinis_prisijungimas
+        id_vartotojas,
+        vardas,
+        pavarde,
+        el_pastas,
+        valiutos_kodas,
+        sukurimo_data,
+        paskutinis_prisijungimas
+        avatar_url
        FROM Vartotojai
        WHERE el_pastas = ?
          AND slaptazodis_hash = ?`,
@@ -64,7 +66,6 @@ router.post("/api/login", async (req, res) => {
 
     const user = rows[0]
 
-    // 🔹 ČIA atnaujinam last login DB’e
     await db.query(
       "UPDATE Vartotojai SET paskutinis_prisijungimas = NOW() WHERE id_vartotojas = ?",
       [user.id_vartotojas],
@@ -73,13 +74,14 @@ router.post("/api/login", async (req, res) => {
     // Perskaitom dar kartą, kad gautume jau atnaujintą timestamp
     const [updatedRows] = await db.query(
       `SELECT 
-         id_vartotojas,
-         vardas,
-         pavarde,
-         el_pastas,
-         valiutos_kodas,
-         sukurimo_data,
-         paskutinis_prisijungimas
+        id_vartotojas,
+        vardas,
+        pavarde,
+        el_pastas,
+        valiutos_kodas,
+        sukurimo_data,
+        paskutinis_prisijungimas
+        avatar_url
        FROM Vartotojai
        WHERE id_vartotojas = ?`,
       [user.id_vartotojas],
@@ -145,13 +147,14 @@ router.post("/api/register", async (req, res) => {
     // 5. Atsikraunam pilną userį, kad grąžintume frontendui
     const [rows] = await db.query(
       `SELECT 
-         id_vartotojas,
-         vardas,
-         pavarde,
-         el_pastas,
-         valiutos_kodas,
-         sukurimo_data,
-         paskutinis_prisijungimas
+        id_vartotojas,
+        vardas,
+        pavarde,
+        el_pastas,
+        valiutos_kodas,
+        sukurimo_data,
+        paskutinis_prisijungimas
+        avatar_url
        FROM Vartotojai
        WHERE id_vartotojas = ?`,
       [newUserId],
@@ -204,14 +207,15 @@ router.post("/api/login/google", async (req, res) => {
 
     const [existingRows] = await db.query(
       `SELECT 
-         id_vartotojas,
-         vardas,
-         pavarde,
-         el_pastas,
-         slaptazodis_hash,
-         sukurimo_data,
-         paskutinis_prisijungimas,
-         valiutos_kodas
+        id_vartotojas,
+        vardas,
+        pavarde,
+        el_pastas,
+        slaptazodis_hash,
+        sukurimo_data,
+        paskutinis_prisijungimas,
+        valiutos_kodas
+        avatar_url
        FROM vartotojai
        WHERE el_pastas = ?`,
       [email],
@@ -261,6 +265,7 @@ router.post("/api/login/google", async (req, res) => {
          sukurimo_data,
          paskutinis_prisijungimas,
          valiutos_kodas
+         avatar_url
        FROM vartotojai
        WHERE id_vartotojas = ?`,
       [userId],
@@ -311,13 +316,14 @@ router.put("/api/profile", async (req, res) => {
     // perskaitom atnaujintą userį
     const [rows] = await db.query(
       `SELECT 
-         id_vartotojas,
-         vardas,
-         pavarde,
-         el_pastas,
-         valiutos_kodas,
-         sukurimo_data,
-         paskutinis_prisijungimas
+        id_vartotojas,
+        vardas,
+        pavarde,
+        el_pastas,
+        valiutos_kodas,
+        sukurimo_data,
+        paskutinis_prisijungimas
+        avatar_url
        FROM Vartotojai
        WHERE id_vartotojas = ?`,
       [userId],
@@ -382,6 +388,75 @@ router.post("/api/profile/password", async (req, res) => {
   } catch (err) {
     console.error("Change password error:", err)
     return res.status(500).json({ message: "Serverio klaida keičiant slaptažodį" })
+  }
+})
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "..", "uploads", "avatars"))
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname) // .png, .jpg
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9)
+    cb(null, unique + ext)
+  },
+})
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Leidžiami tik paveikslėliai"))
+    }
+    cb(null, true)
+  },
+})
+
+// 🔹 Avatar upload: POST /api/profile/avatar
+router.post("/api/profile/avatar", upload.single("avatar"), async (req, res) => {
+  try {
+    const userId = req.header("x-user-id")
+    if (!userId) {
+      return res.status(401).json({ message: "Nerastas vartotojo ID (x-user-id)" })
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "Failas negautas" })
+    }
+
+    // Kelias, kuriuo frontend pasieks avatarą
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`
+
+    // Atnaujinam DB
+    await db.query(
+      `UPDATE Vartotojai
+       SET avatar_url = ?
+       WHERE id_vartotojas = ?`,
+      [avatarUrl, userId],
+    )
+
+    // Grąžinam pilną userį
+    const [rows] = await db.query(
+      `SELECT
+         id_vartotojas,
+         vardas,
+         pavarde,
+         el_pastas,
+         valiutos_kodas,
+         sukurimo_data,
+         paskutinis_prisijungimas,
+         avatar_url
+       FROM Vartotojai
+       WHERE id_vartotojas = ?`,
+      [userId],
+    )
+
+    const user = rows[0]
+
+    res.json({ user })
+  } catch (err) {
+    console.error("Avatar upload error:", err)
+    res.status(500).json({ message: "Klaida keliant avatarą" })
   }
 })
 
