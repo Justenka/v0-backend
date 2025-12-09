@@ -41,7 +41,6 @@ router.post("/api/login", async (req, res) => {
 
     const passwordHash = hashPassword(password)
 
-    // MySQL sintaksė: be "..." ir su ? placeholderiais
     const [rows] = await db.query(
       `SELECT 
          id_vartotojas,
@@ -64,7 +63,37 @@ router.post("/api/login", async (req, res) => {
     }
 
     const user = rows[0]
-    return res.json({ user })
+
+    // 🔹 ČIA atnaujinam last login DB’e
+    await db.query(
+      "UPDATE Vartotojai SET paskutinis_prisijungimas = NOW() WHERE id_vartotojas = ?",
+      [user.id_vartotojas],
+    )
+
+    // 🔹 Perskaitom dar kartą, kad gautume jau atnaujintą timestamp
+    const [updatedRows] = await db.query(
+      `SELECT 
+         id_vartotojas,
+         vardas,
+         pavarde,
+         el_pastas,
+         valiutos_kodas,
+         sukurimo_data,
+         paskutinis_prisijungimas
+       FROM Vartotojai
+       WHERE id_vartotojas = ?`,
+      [user.id_vartotojas],
+    )
+
+    const updatedUser = updatedRows[0]
+
+    // jei nori JWT – gali čia
+    // const token = createJwt(updatedUser)
+
+    return res.json({
+      user: updatedUser,
+      // token
+    })
   } catch (err) {
     console.error("Login error:", err)
     return res.status(500).json({ message: "Serverio klaida prisijungiant" })
@@ -145,36 +174,34 @@ router.post("/api/register", async (req, res) => {
  */
 router.post("/api/login/google", async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken } = req.body
 
     if (!idToken) {
-      return res.status(400).json({ message: "Trūksta Google idToken" });
+      return res.status(400).json({ message: "Trūksta Google idToken" })
     }
 
-    // 1. Patvirtiname token naudodami Google
     const ticket = await googleClient.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    })
 
-    const payload = ticket.getPayload();
+    const payload = ticket.getPayload()
     if (!payload) {
-      return res.status(401).json({ message: "Neteisingas Google tokenas" });
+      return res.status(401).json({ message: "Neteisingas Google tokenas" })
     }
 
-    const email = payload.email;
-    const fullName = payload.name || "";
+    const email = payload.email
+    const fullName = payload.name || ""
 
     if (!email) {
       return res
         .status(400)
-        .json({ message: "Google paskyra neturi el. pašto" });
+        .json({ message: "Google paskyra neturi el. pašto" })
     }
 
-    const [firstName, ...lastParts] = fullName.split(" ");
-    const lastName = lastParts.join(" ");
+    const [firstName, ...lastParts] = fullName.split(" ")
+    const lastName = lastParts.join(" ")
 
-    // 2. Ieškoti vartotojo lenteleje `vartotojai` el. paštu
     const [existingRows] = await db.query(
       `SELECT 
          id_vartotojas,
@@ -187,26 +214,25 @@ router.post("/api/login/google", async (req, res) => {
          valiutos_kodas
        FROM vartotojai
        WHERE el_pastas = ?`,
-      [email]
-    );
+      [email],
+    )
 
-    let user;
+    let userId
 
     if (existingRows.length > 0) {
-      // 3a. Vartotojas egzistuoja
-      user = existingRows[0];
+      // egzistuojantis
+      const existingUser = existingRows[0]
+      userId = existingUser.id_vartotojas
 
       await db.query(
         "UPDATE vartotojai SET paskutinis_prisijungimas = NOW() WHERE id_vartotojas = ?",
-        [user.id_vartotojas]
-      );
+        [userId],
+      )
     } else {
-      // 3b. Vartotojo nėra, sukurti naują „Google“ naudotoją
-      // `slaptazodis_hash` NĖRA NULL, todėl įdedame atsitiktinę maiša šis vartotojas prisijungs tik su Google.
-      const randomPassword = crypto.randomBytes(16).toString("hex");
-      const passwordHash = hashPassword(randomPassword);
-
-      const defaultCurrencyId = 1;
+      // naujas
+      const randomPassword = crypto.randomBytes(16).toString("hex")
+      const passwordHash = hashPassword(randomPassword)
+      const defaultCurrencyId = 1
 
       const [insertResult] = await db.query(
         `INSERT INTO vartotojai 
@@ -218,42 +244,39 @@ router.post("/api/login/google", async (req, res) => {
           email,
           passwordHash,
           defaultCurrencyId,
-        ]
-      );
+        ],
+      )
 
-      const newUserId = insertResult.insertId;
-
-      const [rows] = await db.query(
-        `SELECT 
-           id_vartotojas,
-           vardas,
-           pavarde,
-           el_pastas,
-           slaptazodis_hash,
-           sukurimo_data,
-           paskutinis_prisijungimas,
-           valiutos_kodas
-         FROM vartotojai
-         WHERE id_vartotojas = ?`,
-        [newUserId]
-      );
-
-      user = rows[0];
+      userId = insertResult.insertId
     }
 
-    const token = createJwt(user);
+    // 🔹 ČIA – vieningai perskaitom userį su nauju paskutinis_prisijungimas
+    const [rows] = await db.query(
+      `SELECT 
+         id_vartotojas,
+         vardas,
+         pavarde,
+         el_pastas,
+         slaptazodis_hash,
+         sukurimo_data,
+         paskutinis_prisijungimas,
+         valiutos_kodas
+       FROM vartotojai
+       WHERE id_vartotojas = ?`,
+      [userId],
+    )
 
-    return res.json({
-      user,
-      token
-    });
+    const user = rows[0]
+    const token = createJwt(user)
+
+    return res.json({ user, token })
   } catch (err) {
-    console.error("Google login error:", err);
+    console.error("Google login error:", err)
     return res
       .status(500)
-      .json({ message: "Serverio klaida prisijungiant per Google" });
+      .json({ message: "Serverio klaida prisijungiant per Google" })
   }
-});
+})
 
 
 module.exports = router
