@@ -4,13 +4,15 @@ const db = require("../db")
 
 const router = express.Router()
 
-// Helper: map DB user -> friend DTO
+// Helper: DB user -> "backend friend" objektas
+// (čia dar NEDAROM pilno URL, paliekam avatar_url – frontend'as susikonstruos pilną)
 function mapDbUserToFriend(u) {
   return {
-    id: u.id_vartotojas.toString(),
-    name: `${u.vardas} ${u.pavarde}`,
-    email: u.el_pastas,
-    avatar: null, // jei turėsi avatar stulpelį - papildysi
+    id_vartotojas: u.id_vartotojas,
+    vardas: u.vardas,
+    pavarde: u.pavarde,
+    el_pastas: u.el_pastas,
+    avatar_url: u.avatar_url || null,
   }
 }
 
@@ -35,7 +37,8 @@ router.get("/api/friends", async (req, res) => {
         v.id_vartotojas,
         v.vardas,
         v.pavarde,
-        v.el_pastas
+        v.el_pastas,
+        v.avatar_url
       FROM Vartotoju_draugystes d
       JOIN Vartotojai v
         ON v.id_vartotojas = 
@@ -78,7 +81,8 @@ router.get("/api/friend-requests", async (req, res) => {
         v.id_vartotojas,
         v.vardas,
         v.pavarde,
-        v.el_pastas
+        v.el_pastas,
+        v.avatar_url
       FROM Vartotoju_draugystes d
       JOIN Vartotojai v
         ON v.id_vartotojas = d.fk_requester_id
@@ -98,7 +102,8 @@ router.get("/api/friend-requests", async (req, res) => {
         v.id_vartotojas,
         v.vardas,
         v.pavarde,
-        v.el_pastas
+        v.el_pastas,
+        v.avatar_url
       FROM Vartotoju_draugystes d
       JOIN Vartotojai v
         ON v.id_vartotojas = d.fk_addressee_id
@@ -130,7 +135,7 @@ router.get("/api/friend-requests", async (req, res) => {
 
 /**
  * POST /api/friend-requests
- * Body: { fromUserId, identifier }  // identifier = email arba "Vardas Pavardė"
+ * Body: { fromUserId, email }
  */
 router.post("/api/friend-requests", async (req, res) => {
   try {
@@ -143,16 +148,17 @@ router.post("/api/friend-requests", async (req, res) => {
         .json({ message: "Trūksta siuntėjo ID arba el. pašto" })
     }
 
-    // paprasta email validacija
     const emailTrimmed = String(email).trim().toLowerCase()
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(emailTrimmed)) {
-      return res.status(400).json({ message: "Įveskite galiojantį el. pašto adresą" })
+      return res
+        .status(400)
+        .json({ message: "Įveskite galiojantį el. pašto adresą" })
     }
 
-    // 1. Surandam gavėją tik pagal el. paštą
+    // 1. Surandam gavėją pagal el. paštą
     const [byEmail] = await db.query(
-      `SELECT id_vartotojas, vardas, pavarde, el_pastas 
+      `SELECT id_vartotojas, vardas, pavarde, el_pastas, avatar_url
        FROM Vartotojai 
        WHERE LOWER(el_pastas) = ?`,
       [emailTrimmed],
@@ -204,12 +210,7 @@ router.post("/api/friend-requests", async (req, res) => {
 
     return res.status(201).json({
       requestId: insertResult.insertId,
-      toUser: {
-        id: targetUser.id_vartotojas.toString(),
-        name: `${targetUser.vardas} ${targetUser.pavarde}`,
-        email: targetUser.el_pastas,
-        avatar: null,
-      },
+      toUser: mapDbUserToFriend(targetUser),
     })
   } catch (err) {
     console.error("Create friend request error:", err)
@@ -242,13 +243,17 @@ router.post("/api/friend-requests/:id/accept", async (req, res) => {
     )
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Kvietimas nerastas arba jau apdorotas" })
+      return res
+        .status(404)
+        .json({ message: "Kvietimas nerastas arba jau apdorotas" })
     }
 
     return res.json({ message: "Draugas patvirtintas" })
   } catch (err) {
     console.error("Accept friend request error:", err)
-    return res.status(500).json({ message: "Serverio klaida patvirtinant kvietimą" })
+    return res
+      .status(500)
+      .json({ message: "Serverio klaida patvirtinant kvietimą" })
   }
 })
 
@@ -276,13 +281,17 @@ router.post("/api/friend-requests/:id/reject", async (req, res) => {
     )
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Kvietimas nerastas arba jau apdorotas" })
+      return res
+        .status(404)
+        .json({ message: "Kvietimas nerastas arba jau apdorotas" })
     }
 
     return res.json({ message: "Kvietimas atmestas" })
   } catch (err) {
     console.error("Reject friend request error:", err)
-    return res.status(500).json({ message: "Serverio klaida atmetant kvietimą" })
+    return res
+      .status(500)
+      .json({ message: "Serverio klaida atmetant kvietimą" })
   }
 })
 
@@ -319,7 +328,9 @@ router.delete("/api/friends/:friendId", async (req, res) => {
     return res.json({ message: "Draugas pašalintas" })
   } catch (err) {
     console.error("Remove friend error:", err)
-    return res.status(500).json({ message: "Serverio klaida šalinant draugą" })
+    return res
+      .status(500)
+      .json({ message: "Serverio klaida šalinant draugą" })
   }
 })
 

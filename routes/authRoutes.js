@@ -50,7 +50,7 @@ router.post("/api/login", async (req, res) => {
         el_pastas,
         valiutos_kodas,
         sukurimo_data,
-        paskutinis_prisijungimas
+        paskutinis_prisijungimas,
         avatar_url
        FROM Vartotojai
        WHERE el_pastas = ?
@@ -80,7 +80,7 @@ router.post("/api/login", async (req, res) => {
         el_pastas,
         valiutos_kodas,
         sukurimo_data,
-        paskutinis_prisijungimas
+        paskutinis_prisijungimas,
         avatar_url
        FROM Vartotojai
        WHERE id_vartotojas = ?`,
@@ -153,7 +153,7 @@ router.post("/api/register", async (req, res) => {
         el_pastas,
         valiutos_kodas,
         sukurimo_data,
-        paskutinis_prisijungimas
+        paskutinis_prisijungimas,
         avatar_url
        FROM Vartotojai
        WHERE id_vartotojas = ?`,
@@ -214,7 +214,7 @@ router.post("/api/login/google", async (req, res) => {
         slaptazodis_hash,
         sukurimo_data,
         paskutinis_prisijungimas,
-        valiutos_kodas
+        valiutos_kodas,
         avatar_url
        FROM vartotojai
        WHERE el_pastas = ?`,
@@ -264,7 +264,7 @@ router.post("/api/login/google", async (req, res) => {
          slaptazodis_hash,
          sukurimo_data,
          paskutinis_prisijungimas,
-         valiutos_kodas
+         valiutos_kodas,
          avatar_url
        FROM vartotojai
        WHERE id_vartotojas = ?`,
@@ -322,7 +322,7 @@ router.put("/api/profile", async (req, res) => {
         el_pastas,
         valiutos_kodas,
         sukurimo_data,
-        paskutinis_prisijungimas
+        paskutinis_prisijungimas,
         avatar_url
        FROM Vartotojai
        WHERE id_vartotojas = ?`,
