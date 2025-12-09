@@ -9,6 +9,7 @@ const debtRoutes = require('./routes/debtRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const friendsRoutes = require("./routes/friendsRoutes");
 const messagesRoutes = require("./routes/messagesRoutes")
+const UserRoutes = require("./routes/UserRoutes")
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -19,8 +20,8 @@ const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL
 const corsOptions = {
   origin: allowedOrigin,
   credentials: true, // LEIDŽIAM cookies / credentials
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-user-id','Authorization'],
 }
 
 app.use(cors(corsOptions))
@@ -38,6 +39,7 @@ app.use(debtRoutes);
 app.use(categoryRoutes);
 app.use(friendsRoutes);
 app.use(messagesRoutes)
+app.use(UserRoutes)
 
 // Globalus klaidų handleris (nebūtina, bet faina turėti)
 app.use((err, req, res, next) => {
