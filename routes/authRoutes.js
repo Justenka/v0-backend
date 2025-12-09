@@ -70,7 +70,7 @@ router.post("/api/login", async (req, res) => {
       [user.id_vartotojas],
     )
 
-    // 🔹 Perskaitom dar kartą, kad gautume jau atnaujintą timestamp
+    // Perskaitom dar kartą, kad gautume jau atnaujintą timestamp
     const [updatedRows] = await db.query(
       `SELECT 
          id_vartotojas,
@@ -250,7 +250,7 @@ router.post("/api/login/google", async (req, res) => {
       userId = insertResult.insertId
     }
 
-    // 🔹 ČIA – vieningai perskaitom userį su nauju paskutinis_prisijungimas
+    // ČIA – vieningai perskaitom userį su nauju paskutinis_prisijungimas
     const [rows] = await db.query(
       `SELECT 
          id_vartotojas,
@@ -278,5 +278,111 @@ router.post("/api/login/google", async (req, res) => {
   }
 })
 
+// Profilio atnaujinimas (vardas + el. paštas)
+router.put("/api/profile", async (req, res) => {
+  try {
+    const userId = req.header("x-user-id")
+
+    if (!userId) {
+      return res.status(401).json({ message: "Nerastas vartotojo ID (x-user-id)" })
+    }
+
+    const { name, email } = req.body
+
+    if (!name || !email) {
+      return res
+        .status(400)
+        .json({ message: "Reikalingi vardas ir el. paštas" })
+    }
+
+    // splitinam pilną vardą
+    const parts = name.trim().split(" ")
+    const firstName = parts[0]
+    const lastName = parts.slice(1).join(" ") || "-"
+
+    // UPDATE
+    await db.query(
+      `UPDATE Vartotojai
+       SET vardas = ?, pavarde = ?, el_pastas = ?
+       WHERE id_vartotojas = ?`,
+      [firstName, lastName, email, userId],
+    )
+
+    // perskaitom atnaujintą userį
+    const [rows] = await db.query(
+      `SELECT 
+         id_vartotojas,
+         vardas,
+         pavarde,
+         el_pastas,
+         valiutos_kodas,
+         sukurimo_data,
+         paskutinis_prisijungimas
+       FROM Vartotojai
+       WHERE id_vartotojas = ?`,
+      [userId],
+    )
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: "Vartotojas nerastas" })
+    }
+
+    const user = rows[0]
+    return res.json({ user })
+  } catch (err) {
+    console.error("Profile update error:", err)
+    return res.status(500).json({ message: "Serverio klaida atnaujinant profilį" })
+  }
+})
+
+// 🔹 Slaptažodžio keitimas
+router.post("/api/profile/password", async (req, res) => {
+  try {
+    const userId = req.header("x-user-id")
+
+    if (!userId) {
+      return res.status(401).json({ message: "Nerastas vartotojo ID (x-user-id)" })
+    }
+
+    const { currentPassword, newPassword } = req.body
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Reikalingi dabartinis ir naujas slaptažodis" })
+    }
+
+    // pasiimam esamą hash
+    const [rows] = await db.query(
+      `SELECT slaptazodis_hash
+       FROM Vartotojai
+       WHERE id_vartotojas = ?`,
+      [userId],
+    )
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: "Vartotojas nerastas" })
+    }
+
+    const user = rows[0]
+    const currentHash = hashPassword(currentPassword)
+
+    if (currentHash !== user.slaptazodis_hash) {
+      return res.status(400).json({ message: "Neteisingas dabartinis slaptažodis" })
+    }
+
+    const newHash = hashPassword(newPassword)
+
+    await db.query(
+      `UPDATE Vartotojai
+       SET slaptazodis_hash = ?
+       WHERE id_vartotojas = ?`,
+      [newHash, userId],
+    )
+
+    return res.json({ message: "Slaptažodis sėkmingai pakeistas" })
+  } catch (err) {
+    console.error("Change password error:", err)
+    return res.status(500).json({ message: "Serverio klaida keičiant slaptažodį" })
+  }
+})
 
 module.exports = router
