@@ -315,4 +315,43 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/grupes/:groupId/nariai/:userId/role
+ * Grąžina vartotojo rolę konkrečioje grupėje
+ */
+router.get("/api/grupes/:groupId/nariai/:userId/role", async (req, res) => {
+  try {
+    const { groupId, userId } = req.params
+
+    const [rows] = await db.query(
+      `SELECT role, nario_busena
+       FROM grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
+      [groupId, userId]
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Narys grupėje nerastas" })
+    }
+
+    const member = rows[0]
+    
+    // Mapuojame role į tekstinį formatą
+    let roleText = "guest"
+    if (member.role === 1) roleText = "guest"
+    else if (member.role === 2) roleText = "member"
+    else if (member.role === 3) roleText = "admin"
+
+    return res.json({
+      role: member.role,
+      roleText: roleText,
+      nario_busena: member.nario_busena
+    })
+  } catch (err) {
+    console.error("Rolės gavimo klaida:", err)
+    return res.status(500).json({ message: "Serverio klaida gaunant rolę" })
+  }
+});
+
+
 module.exports = router;
