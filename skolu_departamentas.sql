@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 07, 2025 at 09:05 PM
+-- Generation Time: Dec 09, 2025 at 08:14 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -538,18 +538,19 @@ CREATE TABLE `vartotojai` (
   `slaptazodis_hash` varchar(64) NOT NULL,
   `sukurimo_data` datetime NOT NULL,
   `paskutinis_prisijungimas` datetime NOT NULL,
-  `valiutos_kodas` int(11) NOT NULL
+  `valiutos_kodas` int(11) NOT NULL,
+  `avatar_url` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `vartotojai`
 --
 
-INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`) VALUES
-(8, 'KAZKAS', 'KAZKAS', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-03 15:40:21', 1),
-(9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-03 18:39:07', 1),
-(10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-03 19:16:25', 1),
-(11, 'Justas', 'JK', 'jusaltas21@gmail.com', '8f938dbbb8e9ee02542934653abaf03bc0667b791bbee787723591d76c6a2f8b', '2025-12-07 16:24:58', '2025-12-07 16:26:05', 1);
+INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`, `avatar_url`) VALUES
+(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '6c428ba340fd91d746f5df7c2731118679e307bcf6617f9176adeb59ba20b8c6', '2025-12-03 15:40:21', '2025-12-09 20:24:00', 1, '/uploads/avatars/1765306311991-738745992.png'),
+(9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-03 18:39:07', 1, NULL),
+(10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-03 19:16:25', 1, NULL),
+(11, 'Justas', 'JK', 'jusaltas21@gmail.com', '8f938dbbb8e9ee02542934653abaf03bc0667b791bbee787723591d76c6a2f8b', '2025-12-07 16:24:58', '2025-12-09 19:53:17', 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -890,13 +891,13 @@ ALTER TABLE `sistemos_istorijos`
 -- AUTO_INCREMENT for table `skolos`
 --
 ALTER TABLE `skolos`
-  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `skolos_dalys`
 --
 ALTER TABLE `skolos_dalys`
-  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `skolu_statusai`
