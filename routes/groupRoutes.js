@@ -214,6 +214,7 @@ router.get('/api/groups/:groupId/messages', async (req, res) => {
         gz.fk_id_grupes_narys       AS groupMemberId,
         v.id_vartotojas             AS senderId,
         CONCAT(v.vardas, ' ', v.pavarde) AS senderName,
+        v.avatar_url                AS senderAvatar,
         gz.turinys                  AS content,
         gz.siuntimo_data            AS sentAt,
         gz.redaguota                AS edited,
@@ -271,7 +272,6 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
     const groupMemberId = memberRows[0].id_grupes_narys;
 
     // 2) Įrašom žinutę į grupes_zinutes
-    // redaguota = 0, istrinta = 0, redagavimo_data dabar = NOW()
     const [insertResult] = await db.query(
       `
       INSERT INTO grupes_zinutes
@@ -283,7 +283,7 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
 
     const insertId = insertResult.insertId;
 
-    // 3) Parsiunčiam pilną įrašą su vardu/pavarde
+    // 3) Parsiunčiam pilną įrašą su vardu/pavarde ir avataru
     const [rows] = await db.query(
       `
       SELECT 
@@ -292,6 +292,7 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
         gz.fk_id_grupes_narys       AS groupMemberId,
         v.id_vartotojas             AS senderId,
         CONCAT(v.vardas, ' ', v.pavarde) AS senderName,
+        v.avatar_url                AS senderAvatar,
         gz.turinys                  AS content,
         gz.siuntimo_data            AS sentAt,
         gz.redaguota                AS edited,
