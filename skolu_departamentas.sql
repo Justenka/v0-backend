@@ -538,8 +538,10 @@ CREATE TABLE `valiutos` (
 
 INSERT INTO `valiutos` (`id_valiuta`, `name`, `santykis`) VALUES
 (1, 'EUR', 1),
-(2, 'USD', 1.1637),
-(3, 'PLN', 4.2303);
+(2, 'USD', 1.1634),
+(3, 'PLN', 4.2248),
+(4, 'GBP', 0.8741),
+(5, 'JPY', 182.32);
 
 -- --------------------------------------------------------
 
