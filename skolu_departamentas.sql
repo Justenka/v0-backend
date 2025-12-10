@@ -444,6 +444,7 @@ CREATE TABLE `skolos_dalys` (
   `suma` decimal(10,2) NOT NULL,
   `procentas` decimal(5,2) NOT NULL,
   `apmoketa` tinyint(1) NOT NULL,
+  `sumoketa` decimal(10,2) NOT NULL DEFAULT 0.00,
   `delspinigiai` tinyint(1) NOT NULL,
   `vaidmuo` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

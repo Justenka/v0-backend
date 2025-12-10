@@ -15,7 +15,7 @@ router.get('/api/groups/:id', async (req, res) => {
       `SELECT g.*, v.vardas AS owner_vardas, v.pavarde AS owner_pavarde
        FROM Grupes g
        JOIN Vartotojai v ON g.fk_id_vartotojas = v.id_vartotojas
-       WHERE g.id_grupe = ?`, 
+       WHERE g.id_grupe = ?`,
       [id]
     );
 
@@ -32,11 +32,76 @@ router.get('/api/groups/:id', async (req, res) => {
          gn.role
        FROM Grupes_nariai gn
        JOIN Vartotojai v ON gn.fk_id_vartotojas = v.id_vartotojas
-       WHERE gn.fk_id_grupe = ?`, 
+       WHERE gn.fk_id_grupe = ?`,
       [id]
     );
 
-    // 3. Visos skolos su kategorijomis ir mokėtoju
+    // 3. Apskaičiuojame balansą kiekvienam nariui
+    const membersWithBalance = await Promise.all(
+      memberRows.map(async (member) => {
+        // Gauti visas skolos dalis šiam nariui šioje grupėje
+        const [parts] = await db.query(
+          `SELECT 
+             sd.suma,
+             sd.sumoketa,
+             sd.vaidmuo,
+             s.fk_id_vartotojas AS payerId
+           FROM Skolos_dalys sd
+           JOIN Skolos s ON sd.fk_id_skola = s.id_skola
+           WHERE s.fk_id_grupe = ? 
+             AND sd.fk_id_vartotojas = ?
+             AND s.skolos_statusas = 1`,
+          [id, member.id]
+        );
+
+        let balance = 0;
+
+        for (const part of parts) {
+          const suma = Number(part.suma);
+          const sumoketa = Number(part.sumoketa);
+          const remainingDebt = suma - sumoketa;
+
+          if (part.vaidmuo === 1) {
+            // Skolininkas - neigiamas balansas (skolingas kitiems)
+            balance -= remainingDebt;
+          } else if (part.vaidmuo === 2) {
+            // Kreditorius - teigiamas balansas (kiti jam skolingi)
+            // Reikia suskaičiuoti, kiek jam skolingi kiti
+            const [otherParts] = await db.query(
+              `SELECT suma, sumoketa 
+               FROM Skolos_dalys 
+               WHERE fk_id_skola = (
+                 SELECT fk_id_skola 
+                 FROM Skolos_dalys 
+                 WHERE id_skolos_dalis IN (
+                   SELECT id_skolos_dalis 
+                   FROM Skolos_dalys 
+                   WHERE fk_id_vartotojas = ? 
+                     AND vaidmuo = 2
+                 )
+               ) AND vaidmuo = 1`,
+              [member.id]
+            );
+
+            for (const op of otherParts) {
+              const opSuma = Number(op.suma);
+              const opSumoketa = Number(op.sumoketa);
+              balance += (opSuma - opSumoketa);
+            }
+          }
+        }
+
+        return {
+          id: member.id,
+          name: member.name,
+          email: member.email || `${member.name.toLowerCase()}@example.com`,
+          role: member.role === 1 ? "admin" : "member",
+          balance: balance || 0 // Ensure it's 0 instead of null/undefined
+        };
+      })
+    );
+
+    // 4. Visos skolos su kategorijomis ir mokėtoju
     const [debtRows] = await db.query(
       `SELECT 
          s.id_skola AS id,
@@ -52,11 +117,11 @@ router.get('/api/groups/:id', async (req, res) => {
        JOIN Vartotojai v ON s.fk_id_vartotojas = v.id_vartotojas
        LEFT JOIN kategorijos k ON s.kategorija = k.id_kategorija
        WHERE s.fk_id_grupe = ?
-       ORDER BY s.sukurimo_data DESC`, 
+       ORDER BY s.sukurimo_data DESC`,
       [id]
     );
 
-    // 4. Prie kiekvienos skolos pridėti splitType
+    // 5. Prie kiekvienos skolos pridėti splitType
     const transactions = await Promise.all(
       debtRows.map(async (debt) => {
         const [parts] = await db.query(
@@ -90,12 +155,7 @@ router.get('/api/groups/:id', async (req, res) => {
 
     res.json({
       ...groupRows[0],
-      members: memberRows.map(m => ({
-        id: m.id,
-        name: m.name,
-        email: m.email || `${m.name.toLowerCase()}@example.com`,
-        role: m.role === 1 ? "admin" : "member"
-      })),
+      members: membersWithBalance,
       transactions // svarbiausia!
     });
 
@@ -207,7 +267,7 @@ router.post('/api/debts', async (req, res) => {
     if (currencyCode) {
       const code = currencyCode.trim().toUpperCase();
       const currencyMap = { 'EUR': 1, 'USD': 2, 'PLN': 3 };
-      
+
       if (currencyMap[code]) {
         valiutos_kodas = currencyMap[code];
       } else {
@@ -297,10 +357,12 @@ router.post('/api/debts', async (req, res) => {
     // 2. Sukuriame skolos dalis - SVARBU: dalis taip pat konvertuojame į eurus
     for (const split of splits) {
       const role = Number(split.userId) === Number(paidByUserId) ? 2 : 1;
+
+      // *** NAUJAS LOGIKA: Apskaičiuojame sumą pagal procentus ***
       
       let splitAmount = split.amount || 0;
       let splitPercentage = split.percentage || 0;
-      
+
       // Jei pateiktas procentas bet nėra sumos, apskaičiuojame sumą
       if (splitPercentage > 0 && splitAmount === 0) {
         splitAmount = (originalAmount * splitPercentage) / 100;
@@ -311,21 +373,28 @@ router.post('/api/debts', async (req, res) => {
         splitPercentage = (splitAmount / originalAmount) * 100;
         console.log(`Apskaičiuotas procentas iš ${splitAmount}: ${splitPercentage}%`);
       }
+
+      // *** FIX: If vaidmuo is 2, mark as paid and set sumoketa = suma ***
+      const apmoketa = role === 2 ? 1 : 0;
+      const sumoketa = role === 2 ? splitAmount : 0;
+
       
       // KONVERTUOJAME SPLIT SUMĄ Į EURUS
       const splitAmountInEUR = splitAmount / valiutosSantykis;
       
       await connection.query(
         `INSERT INTO Skolos_dalys 
-          (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, delspinigiai, vaidmuo)
-         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+          (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, sumoketa, delspinigiai, vaidmuo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           debtId,
           split.userId,
           splitAmountInEUR, // KONVERTUOTA SUMA EURAIS
           splitPercentage,
-          lateFeeAmount > 0 ? 1 : 0,
-          role
+          apmoketa,
+          sumoketa,
+          lateFeeAmount > 0 ? 1 : 0,  // delspinigiai
+          role  // vaidmuo - THIS SHOULD BE 1 or 2, NOT 0
         ]
       );
     }
@@ -407,7 +476,7 @@ router.get('/api/categories-by-group/:groupId', async (req, res) => {
 // ------------------------------------------
 router.delete('/api/debts/:debtId', async (req, res) => {
   const { debtId } = req.params;
-  
+
   // Gauname userId iš užklausos - galite naudoti authMiddleware arba siųsti per body/header
   // Šiuo atveju tikriname per header'į arba query parametrą
   const userId = req.headers['x-user-id'] || req.query.userId;
@@ -519,7 +588,7 @@ router.get('/api/debts/:debtId', async (req, res) => {
         amount: Number(p.amount),
         percentage: Number(p.percentage),
         role: p.role,
-        paid: p.paid === 1
+        paid: p.role === 2
       }))
     });
   } catch (err) {
@@ -624,8 +693,18 @@ router.put('/api/debts/:debtId', async (req, res) => {
     if (splits.length > 0) {
       await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
 
+      // Get the current paidById to determine who should be marked as paid
+      // Get the current paidById to determine who should be marked as paid
+      const [currentDebt] = await connection.query(
+        `SELECT fk_id_vartotojas AS paidById FROM Skolos WHERE id_skola = ?`,
+        [debtId]
+      );
+      const currentPaidById = currentDebt[0]?.paidById || paidById;
+
+      // Insert new splits
       for (const split of splits) {
-        const role = Number(split.userId) === Number(paidById) ? 2 : 1;
+        const role = Number(split.userId) === Number(currentPaidById) ? 2 : 1;
+
         let splitAmount = split.amount || 0;
         let splitPercentage = split.percentage || 0;
 
@@ -636,14 +715,18 @@ router.put('/api/debts/:debtId', async (req, res) => {
           splitPercentage = (splitAmount / originalAmount) * 100;
         }
 
-        // KONVERTUOJAME DALIES SUMĄ Į EUR
+        // *** FIX: If vaidmuo is 2 (payer), mark as paid and set sumoketa = suma ***
+        const apmoketa = role === 2 ? 1 : 0;
+        const sumoketa = role === 2 ? splitAmount : 0;
         const splitAmountInEUR = splitAmount / valiutosSantykis;
+
+        console.log(`Debug: userId=${split.userId}, paidById=${currentPaidById}, role=${role}, apmoketa=${apmoketa}, sumoketa=${sumoketa}`);
 
         await connection.query(
           `INSERT INTO Skolos_dalys 
-            (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, delspinigiai, vaidmuo)
-           VALUES (?, ?, ?, ?, 0, 0, ?)`,
-          [debtId, split.userId, splitAmountInEUR, splitPercentage, role]
+            (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, sumoketa, delspinigiai, vaidmuo)
+          VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+          [debtId, split.userId, splitAmountInEUR, splitPercentage, apmoketa, sumoketa, role]  // role should be 1 or 2
         );
       }
     }
@@ -667,7 +750,7 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
   const { groupId, userId } = req.params;
 
   try {
-    // Get all unpaid debts where userId is involved
+    // Get all active debts in the group
     const [debts] = await db.query(
       `SELECT 
          s.id_skola,
@@ -690,6 +773,7 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
            sd.fk_id_vartotojas AS userId,
            v.vardas AS userName,
            sd.suma AS amount,
+           sd.sumoketa AS amountPaid,
            sd.apmoketa AS paid,
            sd.vaidmuo AS role
          FROM Skolos_dalys sd
@@ -702,13 +786,16 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
 
       // Calculate balances
       for (const part of parts) {
-        if (part.paid === 1) continue; // Skip paid parts
-
         const partUserId = part.userId;
         const partAmount = Number(part.amount);
+        const amountPaid = Number(part.amountPaid);
+        const remainingDebt = partAmount - amountPaid;
 
-        // If current user paid and someone else owes
-        if (Number(debt.payerId) === Number(userId) && partUserId !== Number(userId)) {
+        // Skip if fully paid or no remaining debt
+        if (remainingDebt <= 0) continue;
+
+        // If current user paid and someone else owes (and they haven't fully paid)
+        if (Number(debt.payerId) === Number(userId) && partUserId !== Number(userId) && part.role === 1) {
           const key = `${partUserId}`;
           if (!balances[key]) {
             balances[key] = {
@@ -716,13 +803,13 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
               userName: part.userName,
               amount: 0,
               currency,
-              type: 'owes_me' // they owe current user
+              type: 'owes_me'
             };
           }
-          balances[key].amount += partAmount;
+          balances[key].amount += remainingDebt;
         }
-        // If current user owes someone else
-        else if (partUserId === Number(userId) && Number(debt.payerId) !== Number(userId)) {
+        // If current user owes (they have an unpaid part but didn't pay)
+        else if (partUserId === Number(userId) && Number(debt.payerId) !== Number(userId) && part.role === 1) {
           const key = `${debt.payerId}`;
           if (!balances[key]) {
             balances[key] = {
@@ -730,15 +817,20 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
               userName: debt.payerName,
               amount: 0,
               currency,
-              type: 'i_owe' // current user owes them
+              type: 'i_owe'
             };
           }
-          balances[key].amount += partAmount;
+          balances[key].amount += remainingDebt;
         }
       }
     }
 
-    res.json(Object.values(balances));
+    // Filter out zero balances
+    const filteredBalances = Object.values(balances).filter(b => b.amount > 0);
+
+    console.log(`Balances for user ${userId} in group ${groupId}:`, filteredBalances);
+
+    res.json(filteredBalances);
   } catch (err) {
     console.error('Get balances error:', err);
     res.status(500).json({ message: 'Serverio klaida' });
@@ -766,7 +858,6 @@ router.post('/api/payments', async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Get currency code
     let valiutos_kodas = 1;
     if (currencyCode) {
       const code = currencyCode.trim().toUpperCase();
@@ -776,28 +867,25 @@ router.post('/api/payments', async (req, res) => {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Insert payment record
-    const [result] = await connection.query(
-      `INSERT INTO Mokejimai 
-        (fk_id_skolos_dalis, fk_id_vartotojas, data, suma, kursas_eurui)
-       VALUES (NULL, ?, ?, ?, 1.0000)`,
-      [fromUserId, today, amount]
-    );
-
-    // Find and update relevant debt parts
-    // Get unpaid debts where fromUserId owes toUserId
+    // Find unpaid debts where fromUserId owes toUserId
     const [parts] = await connection.query(
-      `SELECT sd.id_skolos_dalis, sd.suma, sd.fk_id_skola
+      `SELECT sd.id_skolos_dalis, sd.suma, sd.sumoketa, sd.fk_id_skola
        FROM Skolos_dalys sd
        JOIN Skolos s ON sd.fk_id_skola = s.id_skola
        WHERE s.fk_id_grupe = ?
          AND s.fk_id_vartotojas = ?
          AND sd.fk_id_vartotojas = ?
-         AND sd.apmoketa = 0
+         AND sd.vaidmuo = 1
+         AND sd.suma > sd.sumoketa
          AND s.skolos_statusas = 1
        ORDER BY s.sukurimo_data ASC`,
       [groupId, toUserId, fromUserId]
     );
+
+    if (parts.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ message: 'Nerasta skolų, kurias galima apmokėti' });
+    }
 
     let remainingAmount = amount;
 
@@ -805,29 +893,47 @@ router.post('/api/payments', async (req, res) => {
       if (remainingAmount <= 0) break;
 
       const partAmount = Number(part.suma);
+      const alreadyPaid = Number(part.sumoketa);
+      const stillOwed = partAmount - alreadyPaid;
 
-      if (remainingAmount >= partAmount) {
-        // Mark as fully paid
+      let paymentAmount = 0;
+
+      if (remainingAmount >= stillOwed) {
+        // Fully pay this part
+        paymentAmount = stillOwed;
         await connection.query(
-          `UPDATE Skolos_dalys SET apmoketa = 1 WHERE id_skolos_dalis = ?`,
+          `UPDATE Skolos_dalys 
+           SET apmoketa = 1, sumoketa = suma 
+           WHERE id_skolos_dalis = ?`,
           [part.id_skolos_dalis]
         );
-        remainingAmount -= partAmount;
+        remainingAmount -= stillOwed;
       } else {
-        // Partial payment - reduce the amount
-        const newAmount = partAmount - remainingAmount;
+        // Partial payment
+        paymentAmount = remainingAmount;
+        const newPaidAmount = alreadyPaid + remainingAmount;
         await connection.query(
-          `UPDATE Skolos_dalys SET suma = ? WHERE id_skolos_dalis = ?`,
-          [newAmount, part.id_skolos_dalis]
+          `UPDATE Skolos_dalys 
+           SET sumoketa = ? 
+           WHERE id_skolos_dalis = ?`,
+          [newPaidAmount, part.id_skolos_dalis]
         );
         remainingAmount = 0;
       }
+
+      // Insert payment record with proper fk_id_skolos_dalis
+      await connection.query(
+        `INSERT INTO Mokejimai 
+          (fk_id_skolos_dalis, fk_id_vartotojas, data, suma, kursas_eurui)
+         VALUES (?, ?, ?, ?, 1.0000)`,
+        [part.id_skolos_dalis, fromUserId, today, paymentAmount]
+      );
     }
 
     await connection.commit();
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Mokėjimas užregistruotas',
-      paymentId: result.insertId 
+      amountPaid: amount - remainingAmount
     });
   } catch (err) {
     await connection.rollback();
