@@ -202,6 +202,7 @@ router.post('/api/debts', async (req, res) => {
 
     // --- PATIKIMAS VALIUTOS NUSTATYMAS ---
     let valiutos_kodas = 1; // default EUR
+    let valiutosSantykis = 1.0; // EUR santykis
 
     if (currencyCode) {
       const code = currencyCode.trim().toUpperCase();
@@ -228,14 +229,35 @@ router.post('/api/debts', async (req, res) => {
       }
     }
 
-    console.log('Naudojamas valiutos_kodas:', valiutos_kodas);
+    // Gauname valiutos santykį iš lentelės
+    try {
+      const [valiutaRows] = await connection.query(
+        `SELECT santykis FROM valiutos WHERE id_valiuta = ? LIMIT 1`,
+        [valiutos_kodas]
+      );
+      
+      if (valiutaRows.length > 0) {
+        valiutosSantykis = parseFloat(valiutaRows[0].santykis);
+        console.log(`Valiutos ${valiutos_kodas} santykis: ${valiutosSantykis}`);
+      }
+    } catch (e) {
+      console.error('Klaida gaunant valiutos santykį:', e);
+      // Naudojame default 1.0 jei įvyko klaida
+    }
 
-    // *** FIX: Konvertuojame categoryId į skaičių arba null ***
+    // --- KONVERTUOJAME SUMĄ Į EURUS ---
+    const originalAmount = parseFloat(amount);
+    const amountInEUR = originalAmount;
+    
+    console.log(`Originali suma: ${originalAmount} (valiuta: ${valiutos_kodas})`);
+    console.log(`Suma eurais: ${amountInEUR}`);
+    console.log(`Santykis naudotas: ${valiutosSantykis}`);
+
+    // Kategorijos apdorojimas
     let kategorijaId = null;
     if (categoryId) {
       const parsed = parseInt(categoryId, 10);
       if (!isNaN(parsed)) {
-        // Patikriname, ar tokia kategorija egzistuoja
         const [catRows] = await connection.query(
           `SELECT id_kategorija FROM kategorijos WHERE id_kategorija = ? LIMIT 1`,
           [parsed]
@@ -248,47 +270,50 @@ router.post('/api/debts', async (req, res) => {
       }
     }
 
-    // 1. Sukuriame skolą
+    // 1. Sukuriame skolą - įrašome sumą EURAIS, bet išsaugome originalią valiutą
     const [debtResult] = await connection.query(
       `INSERT INTO Skolos 
         (fk_id_grupe, fk_id_vartotojas, pavadinimas, aprasymas, suma, kursas_eurui,
          sukurimo_data, paskutinio_keitimo_data, terminas, valiutos_kodas,
          skolos_statusas, kategorija)
-       VALUES (?, ?, ?, ?, ?, 1.0000, ?, ?, ?, ?, 1, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       [
         groupId,
         paidByUserId,
         title,
         description || null,
-        amount,
+        amountInEUR, // KONVERTUOTA SUMA EURAIS
+        valiutosSantykis, // Išsaugome panaudotą kursą
         today,
         today,
         termDateStr,
-        valiutos_kodas,
+        valiutos_kodas, // Originalios valiutos kodas
         kategorijaId
       ]
     );
 
     const debtId = debtResult.insertId;
 
-    // 2. Sukuriame skolos dalis - su procentų konvertavimu į sumą
+    // 2. Sukuriame skolos dalis - SVARBU: dalis taip pat konvertuojame į eurus
     for (const split of splits) {
       const role = Number(split.userId) === Number(paidByUserId) ? 2 : 1;
       
-      // *** NAUJAS LOGIKA: Apskaičiuojame sumą pagal procentus ***
       let splitAmount = split.amount || 0;
       let splitPercentage = split.percentage || 0;
       
       // Jei pateiktas procentas bet nėra sumos, apskaičiuojame sumą
       if (splitPercentage > 0 && splitAmount === 0) {
-        splitAmount = (amount * splitPercentage) / 100;
+        splitAmount = (originalAmount * splitPercentage) / 100;
         console.log(`Apskaičiuota suma iš ${splitPercentage}%: ${splitAmount}`);
       }
       // Jei pateikta suma bet nėra procento, apskaičiuojame procentą
       else if (splitAmount > 0 && splitPercentage === 0) {
-        splitPercentage = (splitAmount / amount) * 100;
+        splitPercentage = (splitAmount / originalAmount) * 100;
         console.log(`Apskaičiuotas procentas iš ${splitAmount}: ${splitPercentage}%`);
       }
+      
+      // KONVERTUOJAME SPLIT SUMĄ Į EURUS
+      const splitAmountInEUR = splitAmount / valiutosSantykis;
       
       await connection.query(
         `INSERT INTO Skolos_dalys 
@@ -297,7 +322,7 @@ router.post('/api/debts', async (req, res) => {
         [
           debtId,
           split.userId,
-          splitAmount,
+          splitAmountInEUR, // KONVERTUOTA SUMA EURAIS
           splitPercentage,
           lateFeeAmount > 0 ? 1 : 0,
           role
@@ -306,7 +331,13 @@ router.post('/api/debts', async (req, res) => {
     }
 
     await connection.commit();
-    res.status(201).json({ message: 'Išlaida sėkmingai pridėta!', debtId });
+    res.status(201).json({ 
+      message: 'Išlaida sėkmingai pridėta!', 
+      debtId,
+      originalAmount,
+      amountInEUR,
+      conversionRate: valiutosSantykis
+    });
   } catch (err) {
     await connection.rollback();
     console.error('Klaida kuriant skolą:', err);

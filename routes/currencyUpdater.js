@@ -12,13 +12,15 @@ const EXCHANGE_API_URL = "https://api.frankfurter.app/latest"
 async function fetchExchangeRates() {
   try {
     // Gauname kursus su EUR kaip baze
-    const response = await axios.get(`${EXCHANGE_API_URL}?from=EUR&to=USD,PLN`)
+    const response = await axios.get(`${EXCHANGE_API_URL}?from=EUR&to=USD,PLN,GBP,JPY`)
     
     if (response.data && response.data.rates) {
       return {
         EUR: 1, // EUR bazė yra 1
         USD: response.data.rates.USD || 1,
         PLN: response.data.rates.PLN || 1,
+        GBP: response.data.rates.GBP || 1,
+        JPY: response.data.rates.JPY || 1,
       }
     }
     
@@ -67,8 +69,24 @@ async function updateCurrencyRates() {
       console.log(`PLN santykis atnaujintas: ${rates.PLN}`)
     }
 
+    if (rates.JPY) {
+      await db.query(
+        "UPDATE valiutos SET santykis = ? WHERE name = ?",
+        [rates.JPY, "JPY"]
+      )
+      console.log(`JPY santykis atnaujintas: ${rates.JPY}`)
+    }
+
+    if (rates.GBP) {
+      await db.query(
+        "UPDATE valiutos SET santykis = ? WHERE name = ?",
+        [rates.GBP, "GBP"]
+      )
+      console.log(`GBP santykis atnaujintas: ${rates.GBP}`)
+    }
+
     console.log(`[${new Date().toISOString()}] Valiutų kursai sėkmingai atnaujinti!`)
-    console.log(`EUR: 1, USD: ${rates.USD}, PLN: ${rates.PLN}`)
+    console.log(`EUR: 1, USD: ${rates.USD}, PLN: ${rates.PLN}, GBP: ${rates.GBP}, JPY: ${rates.JPY}`)
   } catch (error) {
     console.error("Klaida atnaujinant valiutų kursus:", error)
   }
