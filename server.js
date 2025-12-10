@@ -2,6 +2,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const app = express();
+const path = require("path")
+
+const PORT = process.env.PORT || 4000;
 
 const authRoutes = require('./routes/authRoutes');
 const groupRoutes = require('./routes/groupRoutes');
@@ -12,9 +16,6 @@ const messagesRoutes = require("./routes/messagesRoutes")
 const UserRoutes = require("./routes/UserRoutes")
 const currencyRoutes = require("./routes/CurrencyRoutes")
 const { startCurrencyUpdater } = require("./routes/currencyUpdater")
-
-const app = express();
-const PORT = process.env.PORT || 4000;
 
 // Middleware
 const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL
@@ -45,6 +46,8 @@ app.use(friendsRoutes);
 app.use(messagesRoutes)
 app.use(UserRoutes)
 app.use(currencyRoutes)
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")))
 
 // Globalus klaidų handleris (nebūtina, bet faina turėti)
 app.use((err, req, res, next) => {

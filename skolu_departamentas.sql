@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 07, 2025 at 09:05 PM
+-- Generation Time: Dec 10, 2025 at 12:32 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -42,14 +42,14 @@ CREATE TABLE `asmeniniai_pranesimai` (
 
 INSERT INTO `asmeniniai_pranesimai` (`id_asmeninis_pranesimas`, `fk_id_vartotojas_siuntejas`, `fk_id_vartotojas_gavejas`, `turinys`, `data`, `pranesimo_busena`) VALUES
 (22, 8, 9, 'alio', '2025-12-03 19:18:46', 1),
-(23, 8, 10, 'labas', '2025-12-03 19:18:57', 0),
-(24, 8, 10, 'aaaaaaaaaa', '2025-12-03 19:18:59', 0),
-(25, 8, 10, 'LABAS', '2025-12-03 19:19:02', 0),
-(26, 8, 10, 'VEIKIA', '2025-12-03 19:19:04', 0),
+(23, 8, 10, 'labas', '2025-12-03 19:18:57', 1),
+(24, 8, 10, 'aaaaaaaaaa', '2025-12-03 19:18:59', 1),
+(25, 8, 10, 'LABAS', '2025-12-03 19:19:02', 1),
+(26, 8, 10, 'VEIKIA', '2025-12-03 19:19:04', 1),
 (27, 9, 8, 'alio', '2025-12-07 20:08:35', 1),
 (28, 8, 9, 'test', '2025-12-07 20:16:40', 1),
 (29, 9, 8, 'nereikia refresh', '2025-12-07 20:16:52', 1),
-(30, 9, 10, 'asd', '2025-12-07 20:17:10', 0),
+(30, 9, 10, 'asd', '2025-12-07 20:17:10', 1),
 (31, 9, 8, 'vel test', '2025-12-07 20:24:07', 1),
 (32, 8, 9, 'veikia', '2025-12-07 20:24:28', 1),
 (33, 8, 9, 'test', '2025-12-07 20:24:55', 1),
@@ -151,7 +151,8 @@ CREATE TABLE `grupes` (
 --
 
 INSERT INTO `grupes` (`id_grupe`, `fk_id_vartotojas`, `pavadinimas`, `aprasas`, `sukurimo_data`) VALUES
-(11, 8, 'labas', NULL, '2025-12-03');
+(11, 8, 'labas', NULL, '2025-12-03'),
+(12, 9, 'testas', NULL, '2025-12-10');
 
 -- --------------------------------------------------------
 
@@ -174,7 +175,8 @@ CREATE TABLE `grupes_nariai` (
 --
 
 INSERT INTO `grupes_nariai` (`id_grupes_narys`, `fk_id_grupe`, `fk_id_sistemos_istorija`, `fk_id_vartotojas`, `prisijungimo_data`, `role`, `nario_busena`) VALUES
-(5, 11, NULL, 8, '0000-00-00', 1, 1);
+(5, 11, NULL, 8, '0000-00-00', 1, 1),
+(6, 12, NULL, 9, '0000-00-00', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -200,7 +202,8 @@ CREATE TABLE `grupes_zinutes` (
 INSERT INTO `grupes_zinutes` (`id_grupes_zinute`, `fk_id_grupes_narys`, `fk_id_grupe`, `turinys`, `siuntimo_data`, `redaguota`, `redagavimo_data`, `istrinta`) VALUES
 (1, 5, 11, 'labas', '2025-12-07 20:05:29', 0, '2025-12-07 20:05:29', 0),
 (2, 5, 11, 'alio', '2025-12-07 20:10:53', 0, '2025-12-07 20:10:53', 0),
-(3, 5, 11, 'labas', '2025-12-07 21:26:07', 0, '2025-12-07 21:26:07', 0);
+(3, 5, 11, 'labas', '2025-12-07 21:26:07', 0, '2025-12-07 21:26:07', 0),
+(4, 6, 12, 'sw', '2025-12-10 00:17:13', 0, '2025-12-10 00:17:13', 0);
 
 -- --------------------------------------------------------
 
@@ -462,17 +465,24 @@ INSERT INTO `skolu_statusai` (`id_skolos_statusas`, `name`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `slaptazodziu_atkurimai`
+-- Table structure for table `slaptazodzio_atkurimas`
 --
 
-CREATE TABLE `slaptazodziu_atkurimai` (
+CREATE TABLE `slaptazodzio_atkurimas` (
   `id_slaptazodzio_atkurimas` int(11) NOT NULL,
   `fk_id_vartotojas` int(11) NOT NULL,
   `tokenas` varchar(10) NOT NULL,
-  `sukurimo_data` date NOT NULL,
-  `galiojimo_trukme` date NOT NULL,
+  `sukurimo_data` datetime NOT NULL,
+  `galiojimo_trukme` datetime NOT NULL,
   `panaudotas` tinyint(1) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `slaptazodzio_atkurimas`
+--
+
+INSERT INTO `slaptazodzio_atkurimas` (`id_slaptazodzio_atkurimas`, `fk_id_vartotojas`, `tokenas`, `sukurimo_data`, `galiojimo_trukme`, `panaudotas`) VALUES
+(5, 8, '16c9fbc45e', '2025-12-10 01:29:13', '2025-12-10 02:29:13', 1);
 
 -- --------------------------------------------------------
 
@@ -538,18 +548,19 @@ CREATE TABLE `vartotojai` (
   `slaptazodis_hash` varchar(64) NOT NULL,
   `sukurimo_data` datetime NOT NULL,
   `paskutinis_prisijungimas` datetime NOT NULL,
-  `valiutos_kodas` int(11) NOT NULL
+  `valiutos_kodas` int(11) NOT NULL,
+  `avatar_url` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `vartotojai`
 --
 
-INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`) VALUES
-(8, 'KAZKAS', 'KAZKAS', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-03 15:40:21', 1),
-(9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-03 18:39:07', 1),
-(10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-03 19:16:25', 1),
-(11, 'Justas', 'JK', 'jusaltas21@gmail.com', '8f938dbbb8e9ee02542934653abaf03bc0667b791bbee787723591d76c6a2f8b', '2025-12-07 16:24:58', '2025-12-07 16:26:05', 1);
+INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`, `avatar_url`) VALUES
+(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-10 01:29:38', 1, '/uploads/avatars/1765318585169-8471192.png'),
+(9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-10 00:16:44', 1, '/uploads/avatars/1765318616988-507908848.png'),
+(10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-10 00:29:49', 1, '/uploads/avatars/1765319419696-742828989.png'),
+(11, 'Justas', 'JK', 'jusaltas21@gmail.com', '8f938dbbb8e9ee02542934653abaf03bc0667b791bbee787723591d76c6a2f8b', '2025-12-07 16:24:58', '2025-12-09 19:53:17', 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -734,9 +745,9 @@ ALTER TABLE `skolu_statusai`
   ADD PRIMARY KEY (`id_skolos_statusas`);
 
 --
--- Indexes for table `slaptazodziu_atkurimai`
+-- Indexes for table `slaptazodzio_atkurimas`
 --
-ALTER TABLE `slaptazodziu_atkurimai`
+ALTER TABLE `slaptazodzio_atkurimas`
   ADD PRIMARY KEY (`id_slaptazodzio_atkurimas`),
   ADD KEY `fk_id_vartotojas` (`fk_id_vartotojas`);
 
@@ -806,19 +817,19 @@ ALTER TABLE `delspinigiai`
 -- AUTO_INCREMENT for table `grupes`
 --
 ALTER TABLE `grupes`
-  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
 --
 ALTER TABLE `grupes_nariai`
-  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `grupes_zinutes`
 --
 ALTER TABLE `grupes_zinutes`
-  MODIFY `id_grupes_zinute` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id_grupes_zinute` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `kategorijos`
@@ -890,13 +901,13 @@ ALTER TABLE `sistemos_istorijos`
 -- AUTO_INCREMENT for table `skolos`
 --
 ALTER TABLE `skolos`
-  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `skolos_dalys`
 --
 ALTER TABLE `skolos_dalys`
-  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `skolu_statusai`
@@ -905,10 +916,10 @@ ALTER TABLE `skolu_statusai`
   MODIFY `id_skolos_statusas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `slaptazodziu_atkurimai`
+-- AUTO_INCREMENT for table `slaptazodzio_atkurimas`
 --
-ALTER TABLE `slaptazodziu_atkurimai`
-  MODIFY `id_slaptazodzio_atkurimas` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `slaptazodzio_atkurimas`
+  MODIFY `id_slaptazodzio_atkurimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `vaidmenys`
@@ -1027,10 +1038,10 @@ ALTER TABLE `skolos_dalys`
   ADD CONSTRAINT `skolos_dalys_ibfk_3` FOREIGN KEY (`vaidmuo`) REFERENCES `vaidmenys` (`id_vaidmuo`);
 
 --
--- Constraints for table `slaptazodziu_atkurimai`
+-- Constraints for table `slaptazodzio_atkurimas`
 --
-ALTER TABLE `slaptazodziu_atkurimai`
-  ADD CONSTRAINT `slaptazodziu_atkurimai_ibfk_1` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`);
+ALTER TABLE `slaptazodzio_atkurimas`
+  ADD CONSTRAINT `slaptazodzio_atkurimas_ibfk_1` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`);
 
 --
 -- Constraints for table `sukuria`
