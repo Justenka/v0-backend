@@ -184,4 +184,32 @@ router.delete("/api/notifications/:id", async (req, res) => {
   }
 })
 
+// GET /api/notifications/messages-unread-count?userId=123
+router.get("/api/notifications/messages-unread-count", async (req, res) => {
+  try {
+    const userId = Number(req.query.userId)
+    if (!userId) {
+      return res.status(400).json({ message: "Trūksta userId" })
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT COUNT(*) AS cnt
+      FROM asmeniniai_pranesimai
+      WHERE fk_id_vartotojas_gavejas  = ?
+        AND pranesimo_busena = 0
+      `,
+      [userId],
+    )
+
+    const unreadCount = rows[0]?.cnt ?? 0
+    res.json({ unreadCount })
+  } catch (err) {
+    console.error("Messages unread count error:", err)
+    res
+      .status(500)
+      .json({ message: "Klaida skaičiuojant žinučių pranešimus" })
+  }
+})
+
 module.exports = router
