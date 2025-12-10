@@ -207,6 +207,51 @@ router.post("/api/friend-requests", async (req, res) => {
       `,
       [requesterId, addresseeId],
     )
+    // 4. Pranešimas gavėjui (jei nustatymuose įjungta)
+    try {
+      // Nuskaitom nustatymus (jei nėra – laikom, kad on)
+      const [settingsRows] = await db.query(
+        "SELECT draugu_kvietimai FROM Pranesimu_nustatymai WHERE fk_id_vartotojas = ?",
+        [addresseeId],
+      )
+
+      let friendInvitesOn = true
+      if (settingsRows.length > 0) {
+        friendInvitesOn = settingsRows[0].draugu_kvietimai === 1
+      }
+
+      if (friendInvitesOn) {
+        // Pasiimam kviečiantį vartotoją, kad turėtume vardą
+        const [reqUserRows] = await db.query(
+          `
+          SELECT vardas, pavarde
+          FROM Vartotojai
+          WHERE id_vartotojas = ?
+          `,
+          [requesterId],
+        )
+
+        const requesterName = reqUserRows.length
+          ? `${reqUserRows[0].vardas} ${reqUserRows[0].pavarde}`
+          : "Kitas vartotojas"
+
+        await db.query(
+          `
+          INSERT INTO Pranesimai
+            (fk_id_vartotojas, tipas, pavadinimas, tekstas, action_url)
+          VALUES (?, 'friend_request', ?, ?, ?)
+          `,
+          [
+            addresseeId,
+            "Naujas draugo kvietimas",
+            `${requesterName} pakvietė jus draugauti`,
+            "/friends",
+          ],
+        )
+      }
+    } catch (notifErr) {
+      console.error("Nepavyko sukurti friend_request pranešimo:", notifErr)
+    }
 
     return res.status(201).json({
       requestId: insertResult.insertId,

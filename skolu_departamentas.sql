@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 10, 2025 at 12:32 AM
+-- Generation Time: Dec 10, 2025 at 03:30 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -146,14 +146,6 @@ CREATE TABLE `grupes` (
   `sukurimo_data` date NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `grupes`
---
-
-INSERT INTO `grupes` (`id_grupe`, `fk_id_vartotojas`, `pavadinimas`, `aprasas`, `sukurimo_data`) VALUES
-(11, 8, 'labas', NULL, '2025-12-03'),
-(12, 9, 'testas', NULL, '2025-12-10');
-
 -- --------------------------------------------------------
 
 --
@@ -169,14 +161,6 @@ CREATE TABLE `grupes_nariai` (
   `role` int(11) NOT NULL,
   `nario_busena` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `grupes_nariai`
---
-
-INSERT INTO `grupes_nariai` (`id_grupes_narys`, `fk_id_grupe`, `fk_id_sistemos_istorija`, `fk_id_vartotojas`, `prisijungimo_data`, `role`, `nario_busena`) VALUES
-(5, 11, NULL, 8, '0000-00-00', 1, 1),
-(6, 12, NULL, 9, '0000-00-00', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -194,16 +178,6 @@ CREATE TABLE `grupes_zinutes` (
   `redagavimo_data` datetime NOT NULL,
   `istrinta` tinyint(1) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `grupes_zinutes`
---
-
-INSERT INTO `grupes_zinutes` (`id_grupes_zinute`, `fk_id_grupes_narys`, `fk_id_grupe`, `turinys`, `siuntimo_data`, `redaguota`, `redagavimo_data`, `istrinta`) VALUES
-(1, 5, 11, 'labas', '2025-12-07 20:05:29', 0, '2025-12-07 20:05:29', 0),
-(2, 5, 11, 'alio', '2025-12-07 20:10:53', 0, '2025-12-07 20:10:53', 0),
-(3, 5, 11, 'labas', '2025-12-07 21:26:07', 0, '2025-12-07 21:26:07', 0),
-(4, 6, 12, 'sw', '2025-12-10 00:17:13', 0, '2025-12-10 00:17:13', 0);
 
 -- --------------------------------------------------------
 
@@ -304,6 +278,24 @@ INSERT INTO `nariu_busenos` (`id_nario_busena`, `name`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `pranesimai`
+--
+
+CREATE TABLE `pranesimai` (
+  `id_pranesimas` int(11) NOT NULL,
+  `fk_id_vartotojas` int(11) NOT NULL,
+  `tipas` enum('group_invite','friend_request','payment_received','payment_reminder','new_expense','group_message','personal_message','system') NOT NULL,
+  `pavadinimas` varchar(255) NOT NULL,
+  `tekstas` text NOT NULL,
+  `nuskaityta` tinyint(1) NOT NULL DEFAULT 0,
+  `sukurta` datetime NOT NULL DEFAULT current_timestamp(),
+  `action_url` varchar(255) DEFAULT NULL,
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `pranesimo_busenos`
 --
 
@@ -349,9 +341,22 @@ INSERT INTO `pranesimo_tipai` (`id_pranesimo_tipas`, `name`) VALUES
 CREATE TABLE `pranesimu_nustatymai` (
   `id_pranesimu_nustatymai` int(11) NOT NULL,
   `fk_id_vartotojas` int(11) NOT NULL,
-  `el_pastas_aktyvus` tinyint(1) NOT NULL,
-  `push_pranesimai` tinyint(1) NOT NULL
+  `el_pastas_aktyvus` tinyint(1) NOT NULL DEFAULT 1,
+  `push_pranesimai` tinyint(1) NOT NULL DEFAULT 1,
+  `draugu_kvietimai` tinyint(1) NOT NULL DEFAULT 1,
+  `grupes_kvietimai` tinyint(1) NOT NULL DEFAULT 1,
+  `naujos_islaidos` tinyint(1) NOT NULL DEFAULT 1,
+  `mokejimo_priminimai` tinyint(1) NOT NULL DEFAULT 1,
+  `zinutes` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `pranesimu_nustatymai`
+--
+
+INSERT INTO `pranesimu_nustatymai` (`id_pranesimu_nustatymai`, `fk_id_vartotojas`, `el_pastas_aktyvus`, `push_pranesimai`, `draugu_kvietimai`, `grupes_kvietimai`, `naujos_islaidos`, `mokejimo_priminimai`, `zinutes`) VALUES
+(1, 8, 1, 1, 1, 1, 1, 1, 1),
+(2, 9, 1, 1, 1, 1, 1, 1, 1);
 
 -- --------------------------------------------------------
 
@@ -482,7 +487,8 @@ CREATE TABLE `slaptazodzio_atkurimas` (
 --
 
 INSERT INTO `slaptazodzio_atkurimas` (`id_slaptazodzio_atkurimas`, `fk_id_vartotojas`, `tokenas`, `sukurimo_data`, `galiojimo_trukme`, `panaudotas`) VALUES
-(5, 8, '16c9fbc45e', '2025-12-10 01:29:13', '2025-12-10 02:29:13', 1);
+(5, 8, '16c9fbc45e', '2025-12-10 01:29:13', '2025-12-10 02:29:13', 1),
+(6, 8, '1d71ab2901', '2025-12-10 13:26:26', '2025-12-10 14:26:26', 0);
 
 -- --------------------------------------------------------
 
@@ -522,17 +528,18 @@ INSERT INTO `vaidmenys` (`id_vaidmuo`, `name`) VALUES
 
 CREATE TABLE `valiutos` (
   `id_valiuta` int(11) NOT NULL,
-  `name` varchar(50) NOT NULL
+  `name` varchar(50) NOT NULL,
+  `santykis` float NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `valiutos`
 --
 
-INSERT INTO `valiutos` (`id_valiuta`, `name`) VALUES
-(1, 'EUR'),
-(2, 'USD'),
-(3, 'PLN');
+INSERT INTO `valiutos` (`id_valiuta`, `name`, `santykis`) VALUES
+(1, 'EUR', 1),
+(2, 'USD', 1.1637),
+(3, 'PLN', 4.2303);
 
 -- --------------------------------------------------------
 
@@ -557,10 +564,9 @@ CREATE TABLE `vartotojai` (
 --
 
 INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`, `avatar_url`) VALUES
-(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-10 01:29:38', 1, '/uploads/avatars/1765318585169-8471192.png'),
+(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-10 15:48:06', 1, '/uploads/avatars/1765318585169-8471192.png'),
 (9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-10 00:16:44', 1, '/uploads/avatars/1765318616988-507908848.png'),
-(10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-10 00:29:49', 1, '/uploads/avatars/1765319419696-742828989.png'),
-(11, 'Justas', 'JK', 'jusaltas21@gmail.com', '8f938dbbb8e9ee02542934653abaf03bc0667b791bbee787723591d76c6a2f8b', '2025-12-07 16:24:58', '2025-12-09 19:53:17', 1, NULL);
+(10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-10 00:29:49', 1, '/uploads/avatars/1765319419696-742828989.png');
 
 -- --------------------------------------------------------
 
@@ -582,9 +588,9 @@ CREATE TABLE `vartotoju_draugystes` (
 --
 
 INSERT INTO `vartotoju_draugystes` (`id_draugyste`, `fk_requester_id`, `fk_addressee_id`, `status`, `created_at`, `updated_at`) VALUES
-(2, 8, 9, 'accepted', '2025-12-03 18:40:12', '2025-12-03 18:40:47'),
 (3, 10, 9, 'accepted', '2025-12-03 19:16:43', '2025-12-07 20:08:11'),
-(4, 10, 8, 'accepted', '2025-12-03 19:16:53', '2025-12-03 19:17:01');
+(4, 10, 8, 'accepted', '2025-12-03 19:16:53', '2025-12-03 19:17:01'),
+(9, 9, 8, 'accepted', '2025-12-10 16:27:53', '2025-12-10 16:27:59');
 
 --
 -- Indexes for dumped tables
@@ -677,6 +683,13 @@ ALTER TABLE `mokejimai`
 --
 ALTER TABLE `nariu_busenos`
   ADD PRIMARY KEY (`id_nario_busena`);
+
+--
+-- Indexes for table `pranesimai`
+--
+ALTER TABLE `pranesimai`
+  ADD PRIMARY KEY (`id_pranesimas`),
+  ADD KEY `fk_id_vartotojas` (`fk_id_vartotojas`);
 
 --
 -- Indexes for table `pranesimo_busenos`
@@ -817,13 +830,13 @@ ALTER TABLE `delspinigiai`
 -- AUTO_INCREMENT for table `grupes`
 --
 ALTER TABLE `grupes`
-  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
 --
 ALTER TABLE `grupes_nariai`
-  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `grupes_zinutes`
@@ -862,6 +875,12 @@ ALTER TABLE `nariu_busenos`
   MODIFY `id_nario_busena` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `pranesimai`
+--
+ALTER TABLE `pranesimai`
+  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT for table `pranesimo_busenos`
 --
 ALTER TABLE `pranesimo_busenos`
@@ -877,7 +896,7 @@ ALTER TABLE `pranesimo_tipai`
 -- AUTO_INCREMENT for table `pranesimu_nustatymai`
 --
 ALTER TABLE `pranesimu_nustatymai`
-  MODIFY `id_pranesimu_nustatymai` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_pranesimu_nustatymai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -919,7 +938,7 @@ ALTER TABLE `skolu_statusai`
 -- AUTO_INCREMENT for table `slaptazodzio_atkurimas`
 --
 ALTER TABLE `slaptazodzio_atkurimas`
-  MODIFY `id_slaptazodzio_atkurimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_slaptazodzio_atkurimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `vaidmenys`
@@ -937,13 +956,13 @@ ALTER TABLE `valiutos`
 -- AUTO_INCREMENT for table `vartotojai`
 --
 ALTER TABLE `vartotojai`
-  MODIFY `id_vartotojas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id_vartotojas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `vartotoju_draugystes`
 --
 ALTER TABLE `vartotoju_draugystes`
-  MODIFY `id_draugyste` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_draugyste` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- Constraints for dumped tables
@@ -1004,6 +1023,12 @@ ALTER TABLE `kvietimai`
 ALTER TABLE `mokejimai`
   ADD CONSTRAINT `mokejimai_ibfk_1` FOREIGN KEY (`fk_id_skolos_dalis`) REFERENCES `skolos_dalys` (`id_skolos_dalis`),
   ADD CONSTRAINT `mokejimai_ibfk_2` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`);
+
+--
+-- Constraints for table `pranesimai`
+--
+ALTER TABLE `pranesimai`
+  ADD CONSTRAINT `pranesimai_ibfk_1` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `pranesimu_nustatymai`

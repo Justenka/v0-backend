@@ -118,9 +118,9 @@ async function ensureSettingsRow(userId) {
   const [insertResult] = await db.query(
     `
     INSERT INTO Pranesimu_nustatymai
-      (fk_id_vartotojas, el_pastas_aktyvus, push_pranesimai,
+      (fk_id_vartotojas, el_pastas_aktyvus, push_pranesimai, draugu_kvietimai,
        grupes_kvietimai, naujos_islaidos, mokejimo_priminimai, zinutes)
-    VALUES (?, 1, 1, 1, 1, 1, 1)
+    VALUES (?, 1, 1, 1, 1, 1, 1, 1)
     `,
     [userId],
   )
@@ -167,6 +167,7 @@ router.patch("/api/pranesimu-nustatymai/:userId", async (req, res) => {
     const {
       el_pastas_aktyvus = current.el_pastas_aktyvus,
       push_pranesimai = current.push_pranesimai,
+      draugu_kvietimai = current.draugu_kvietimai,
       grupes_kvietimai = current.grupes_kvietimai,
       naujos_islaidos = current.naujos_islaidos,
       mokejimo_priminimai = current.mokejimo_priminimai,
@@ -179,6 +180,7 @@ router.patch("/api/pranesimu-nustatymai/:userId", async (req, res) => {
       SET 
         el_pastas_aktyvus = ?,
         push_pranesimai = ?,
+        draugu_kvietimai = ?,
         grupes_kvietimai = ?,
         naujos_islaidos = ?,
         mokejimo_priminimai = ?,
@@ -188,6 +190,7 @@ router.patch("/api/pranesimu-nustatymai/:userId", async (req, res) => {
       [
         el_pastas_aktyvus ? 1 : 0,
         push_pranesimai ? 1 : 0,
+        draugu_kvietimai ? 1 : 0,
         grupes_kvietimai ? 1 : 0,
         naujos_islaidos ? 1 : 0,
         mokejimo_priminimai ? 1 : 0,
