@@ -99,4 +99,89 @@ router.patch("/api/notifications/mark-all-read", async (req, res) => {
   }
 })
 
+// GET /api/notifications/unread-count?userId=123
+router.get("/api/notifications/unread-count", async (req, res) => {
+  try {
+    const userId = Number(req.query.userId)
+    if (!userId) {
+      return res.status(400).json({ message: "Trūksta userId" })
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT COUNT(*) AS cnt
+      FROM Pranesimai
+      WHERE fk_id_vartotojas = ?
+        AND nuskaityta = 0
+      `,
+      [userId],
+    )
+
+    const unreadCount = rows[0]?.cnt ?? 0
+    res.json({ unreadCount })
+  } catch (err) {
+    console.error("Unread count error:", err)
+    res.status(500).json({ message: "Klaida skaičiuojant neprskaitytus" })
+  }
+})
+
+// DELETE /api/notifications/clear-all – ištrinti VISUS vartotojo pranešimus
+router.delete("/api/notifications/clear-all", async (req, res) => {
+  try {
+    const userId = Number(req.body.userId)
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ message: "Trūksta userId" })
+    }
+
+    await db.query(
+      `
+      DELETE FROM Pranesimai
+      WHERE fk_id_vartotojas = ?
+      `,
+      [userId],
+    )
+
+    res.json({ message: "Visi pranešimai ištrinti" })
+  } catch (err) {
+    console.error("Clear notifications error:", err)
+    res.status(500).json({ message: "Serverio klaida trinant pranešimus" })
+  }
+})
+
+// DELETE /api/notifications/:id – ištrinti vieną pranešimą
+router.delete("/api/notifications/:id", async (req, res) => {
+  try {
+    const notifId = Number(req.params.id)
+    const userId = Number(req.body.userId)
+
+    if (!notifId || !userId) {
+      return res
+        .status(400)
+        .json({ message: "Trūksta notification ID arba userId" })
+    }
+
+    const [result] = await db.query(
+      `
+      DELETE FROM Pranesimai
+      WHERE id_pranesimas = ?
+        AND fk_id_vartotojas = ?
+      `,
+      [notifId, userId],
+    )
+
+    if (result.affectedRows === 0) {
+      return res
+        .status(404)
+        .json({ message: "Pranešimas nerastas arba nepriklauso vartotojui" })
+    }
+
+    res.json({ message: "Pranešimas ištrintas" })
+  } catch (err) {
+    console.error("Delete notification error:", err)
+    res.status(500).json({ message: "Serverio klaida trinant pranešimą" })
+  }
+})
+
 module.exports = router
