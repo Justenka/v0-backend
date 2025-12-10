@@ -16,6 +16,7 @@ const messagesRoutes = require("./routes/messagesRoutes")
 const UserRoutes = require("./routes/UserRoutes")
 const currencyRoutes = require("./routes/CurrencyRoutes")
 const { startCurrencyUpdater } = require("./routes/currencyUpdater")
+const settingsRoutes = require("./routes/settingsRoutes")
 
 // Middleware
 const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL
@@ -43,9 +44,10 @@ app.use(groupRoutes);
 app.use(debtRoutes);
 app.use(categoryRoutes);
 app.use(friendsRoutes);
-app.use(messagesRoutes)
-app.use(UserRoutes)
-app.use(currencyRoutes)
+app.use(messagesRoutes);
+app.use(UserRoutes);
+app.use(currencyRoutes);
+app.use(settingsRoutes);
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")))
 
