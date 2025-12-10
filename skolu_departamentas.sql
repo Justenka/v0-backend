@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 10, 2025 at 01:57 PM
+-- Generation Time: Dec 10, 2025 at 02:33 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -278,6 +278,24 @@ INSERT INTO `nariu_busenos` (`id_nario_busena`, `name`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `pranesimai`
+--
+
+CREATE TABLE `pranesimai` (
+  `id_pranesimas` int(11) NOT NULL,
+  `fk_id_vartotojas` int(11) NOT NULL,
+  `tipas` enum('group_invite','friend_request','payment_received','payment_reminder','new_expense','group_message','personal_message','system') NOT NULL,
+  `pavadinimas` varchar(255) NOT NULL,
+  `tekstas` text NOT NULL,
+  `nuskaityta` tinyint(1) NOT NULL DEFAULT 0,
+  `sukurta` datetime NOT NULL DEFAULT current_timestamp(),
+  `action_url` varchar(255) DEFAULT NULL,
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `pranesimo_busenos`
 --
 
@@ -509,17 +527,18 @@ INSERT INTO `vaidmenys` (`id_vaidmuo`, `name`) VALUES
 
 CREATE TABLE `valiutos` (
   `id_valiuta` int(11) NOT NULL,
-  `name` varchar(50) NOT NULL
+  `name` varchar(50) NOT NULL,
+  `santykis` float NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `valiutos`
 --
 
-INSERT INTO `valiutos` (`id_valiuta`, `name`) VALUES
-(1, 'EUR'),
-(2, 'USD'),
-(3, 'PLN');
+INSERT INTO `valiutos` (`id_valiuta`, `name`, `santykis`) VALUES
+(1, 'EUR', 1),
+(2, 'USD', 1.1637),
+(3, 'PLN', 4.2303);
 
 -- --------------------------------------------------------
 
@@ -663,6 +682,13 @@ ALTER TABLE `mokejimai`
 --
 ALTER TABLE `nariu_busenos`
   ADD PRIMARY KEY (`id_nario_busena`);
+
+--
+-- Indexes for table `pranesimai`
+--
+ALTER TABLE `pranesimai`
+  ADD PRIMARY KEY (`id_pranesimas`),
+  ADD KEY `fk_id_vartotojas` (`fk_id_vartotojas`);
 
 --
 -- Indexes for table `pranesimo_busenos`
@@ -848,6 +874,12 @@ ALTER TABLE `nariu_busenos`
   MODIFY `id_nario_busena` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `pranesimai`
+--
+ALTER TABLE `pranesimai`
+  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `pranesimo_busenos`
 --
 ALTER TABLE `pranesimo_busenos`
@@ -990,6 +1022,12 @@ ALTER TABLE `kvietimai`
 ALTER TABLE `mokejimai`
   ADD CONSTRAINT `mokejimai_ibfk_1` FOREIGN KEY (`fk_id_skolos_dalis`) REFERENCES `skolos_dalys` (`id_skolos_dalis`),
   ADD CONSTRAINT `mokejimai_ibfk_2` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`);
+
+--
+-- Constraints for table `pranesimai`
+--
+ALTER TABLE `pranesimai`
+  ADD CONSTRAINT `pranesimai_ibfk_1` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `pranesimu_nustatymai`
