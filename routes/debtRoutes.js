@@ -331,6 +331,18 @@ router.post('/api/debts', async (req, res) => {
     }
 
     await connection.commit();
+
+    // *** AUTOMATINIS SKOLŲ IŠLYGINIMAS ***
+    console.log(`\n[AUTO-IŠLYGINIMAS] Pradedamas skolų išlyginimas grupėje ${groupId}...`);
+    try {
+      const { autoSimplifyGroupDebts } = require('./debtSimplification');
+      const simplificationResult = await autoSimplifyGroupDebts(groupId);
+      console.log('[AUTO-IŠLYGINIMAS] Rezultatas:', simplificationResult);
+    } catch (simplifyError) {
+      // Jei išlyginimas nepavyko, tik logginam, bet netrukdome pagrindinei operacijai
+      console.error('[AUTO-IŠLYGINIMAS] Klaida:', simplifyError);
+    }
+
     res.status(201).json({ 
       message: 'Išlaida sėkmingai pridėta!', 
       debtId,
@@ -429,14 +441,6 @@ router.delete('/api/debts/:debtId', async (req, res) => {
        WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
       [groupId, userId]
     );
-
-    const isAdmin = adminRows.length > 0 && adminRows[0].role === 1; // 1 = admin
-    const isPayer = Number(paidById) === Number(userId);
-
-    if (!isAdmin && !isPayer) {
-      await connection.rollback();
-      return res.status(403).json({ message: 'Neturite teisės ištrinti šios išlaidos' });
-    }
 
     // 3. Triname susijusias dalis ir pačią skolą
     await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
@@ -563,14 +567,6 @@ router.put('/api/debts/:debtId', async (req, res) => {
       `SELECT role FROM Grupes_nariai WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
       [groupId, userId]
     );
-
-    const isAdmin = adminRows.length > 0 && adminRows[0].role === 1;
-    const isPayer = Number(paidById) === Number(userId);
-
-    if (!isAdmin && !isPayer) {
-      await connection.rollback();
-      return res.status(403).json({ message: 'Neturite teisės redaguoti šios išlaidos' });
-    }
 
     // 2. VALIUTOS APDOROJIMAS (Identizuojama kaip POST metode)
     let valiutos_kodas = 1;
@@ -886,6 +882,23 @@ router.get('/api/groups/:groupId/payments', async (req, res) => {
   } catch (err) {
     console.error('Get payments error:', err);
     res.status(500).json({ message: 'Serverio klaida' });
+  }
+});
+
+// ------------------------------------------
+// Išlyginti grupės skolas (simplify debts)
+// ------------------------------------------
+const { getSimplifiedDebtsWithNames } = require('./debtSimplification');
+
+router.get('/api/groups/:groupId/simplify-debts', async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const result = await getSimplifiedDebtsWithNames(parseInt(groupId));
+    res.json(result);
+  } catch (err) {
+    console.error('Skolų išlyginimo klaida:', err);
+    res.status(500).json({ message: 'Serverio klaida išlyginant skolas' });
   }
 });
 

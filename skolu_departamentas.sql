@@ -205,6 +205,7 @@ INSERT INTO `kategorijos` (`id_kategorija`, `name`) VALUES
 (8, 'Bendros išlaidos'),
 (9, 'Mokesčiai'),
 (10, 'Neplanuotos išlaidos');
+(11, 'Išlyginimas');
 
 -- --------------------------------------------------------
 
