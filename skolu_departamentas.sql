@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 10, 2025 at 02:33 PM
+-- Generation Time: Dec 10, 2025 at 03:30 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -355,7 +355,8 @@ CREATE TABLE `pranesimu_nustatymai` (
 --
 
 INSERT INTO `pranesimu_nustatymai` (`id_pranesimu_nustatymai`, `fk_id_vartotojas`, `el_pastas_aktyvus`, `push_pranesimai`, `draugu_kvietimai`, `grupes_kvietimai`, `naujos_islaidos`, `mokejimo_priminimai`, `zinutes`) VALUES
-(1, 8, 1, 1, 0, 0, 0, 0, 0);
+(1, 8, 1, 1, 1, 1, 1, 1, 1),
+(2, 9, 1, 1, 1, 1, 1, 1, 1);
 
 -- --------------------------------------------------------
 
@@ -563,7 +564,7 @@ CREATE TABLE `vartotojai` (
 --
 
 INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`, `avatar_url`) VALUES
-(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-10 13:57:30', 1, '/uploads/avatars/1765318585169-8471192.png'),
+(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-10 15:48:06', 1, '/uploads/avatars/1765318585169-8471192.png'),
 (9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-10 00:16:44', 1, '/uploads/avatars/1765318616988-507908848.png'),
 (10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-10 00:29:49', 1, '/uploads/avatars/1765319419696-742828989.png');
 
@@ -587,9 +588,9 @@ CREATE TABLE `vartotoju_draugystes` (
 --
 
 INSERT INTO `vartotoju_draugystes` (`id_draugyste`, `fk_requester_id`, `fk_addressee_id`, `status`, `created_at`, `updated_at`) VALUES
-(2, 8, 9, 'accepted', '2025-12-03 18:40:12', '2025-12-03 18:40:47'),
 (3, 10, 9, 'accepted', '2025-12-03 19:16:43', '2025-12-07 20:08:11'),
-(4, 10, 8, 'accepted', '2025-12-03 19:16:53', '2025-12-03 19:17:01');
+(4, 10, 8, 'accepted', '2025-12-03 19:16:53', '2025-12-03 19:17:01'),
+(9, 9, 8, 'accepted', '2025-12-10 16:27:53', '2025-12-10 16:27:59');
 
 --
 -- Indexes for dumped tables
@@ -877,7 +878,7 @@ ALTER TABLE `nariu_busenos`
 -- AUTO_INCREMENT for table `pranesimai`
 --
 ALTER TABLE `pranesimai`
-  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `pranesimo_busenos`
@@ -895,7 +896,7 @@ ALTER TABLE `pranesimo_tipai`
 -- AUTO_INCREMENT for table `pranesimu_nustatymai`
 --
 ALTER TABLE `pranesimu_nustatymai`
-  MODIFY `id_pranesimu_nustatymai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_pranesimu_nustatymai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -961,7 +962,7 @@ ALTER TABLE `vartotojai`
 -- AUTO_INCREMENT for table `vartotoju_draugystes`
 --
 ALTER TABLE `vartotoju_draugystes`
-  MODIFY `id_draugyste` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_draugyste` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- Constraints for dumped tables
