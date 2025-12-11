@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const path = require("path")
+const path = require("path");
 
 const PORT = process.env.PORT || 4000;
 
@@ -12,12 +12,12 @@ const groupRoutes = require('./routes/groupRoutes');
 const debtRoutes = require('./routes/debtRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const friendsRoutes = require("./routes/friendsRoutes");
-const messagesRoutes = require("./routes/messagesRoutes")
-const UserRoutes = require("./routes/UserRoutes")
-const currencyRoutes = require("./routes/CurrencyRoutes")
-const { startCurrencyUpdater } = require("./routes/currencyUpdater")
-const settingsRoutes = require("./routes/settingsRoutes")
-const notificationsRoutes = require("./routes/notificationsRoutes")
+const messagesRoutes = require("./routes/messagesRoutes");
+const UserRoutes = require("./routes/UserRoutes");
+const currencyRoutes = require("./routes/CurrencyRoutes");
+const { startCurrencyUpdater } = require("./routes/currencyUpdater");
+const settingsRoutes = require("./routes/settingsRoutes");
+const notificationsRoutes = require("./routes/notificationsRoutes");
 
 // Middleware
 const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL

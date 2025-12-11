@@ -54,8 +54,16 @@ router.post('/api/groups', async (req, res) => {
       [ownerId, groupId]
     );
 
-    const group = rows[0];
+    // 4) Istorija: grupė sukurta
+    await addGroupHistoryEntry(
+      groupId,
+      ownerId,
+      "group_created",
+      `Grupė "${title}" sukurta.`,
+      { ownerId }
+    );
 
+    const group = rows[0];
     res.status(201).json(group);
   } catch (err) {
     console.error('Create group error:', err);
@@ -614,5 +622,58 @@ async function createGroupMessageNotifications(groupId, senderId, messageRow) {
     // notifai – ne kritiniai, request'o nenukertam
   }
 }
+
+// Helperis – įrašyti grupės istorijos įrašą
+async function addGroupHistoryEntry(groupId, userId, type, description, metadata = null) {
+  try {
+    const metaJson = metadata ? JSON.stringify(metadata) : null;
+
+    await db.query(
+      `
+      INSERT INTO Grupes_istorija
+        (fk_id_grupe, fk_id_vartotojas, tipas, aprasymas, metadata)
+      VALUES (?, ?, ?, ?, ?)
+      `,
+      [groupId, userId ?? null, type, description, metaJson]
+    );
+  } catch (err) {
+    console.error("Klaida rašant Grupes_istorija:", err);
+    // istorija neturėtų numušti pagrindinio veiksmo
+  }
+}
+
+// =====================================================
+// GRUPĖS ISTORIJA
+// GET /api/groups/:groupId/history
+// =====================================================
+router.get('/api/groups/:groupId/history', async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        gi.id_istorija      AS id,
+        gi.fk_id_grupe      AS groupId,
+        gi.fk_id_vartotojas AS userId,
+        COALESCE(CONCAT(v.vardas, ' ', v.pavarde), 'Sistema') AS userName,
+        gi.tipas            AS type,
+        gi.aprasymas        AS description,
+        gi.sukurta          AS timestamp,
+        gi.metadata         AS metadata
+      FROM Grupes_istorija gi
+      LEFT JOIN Vartotojai v ON v.id_vartotojas = gi.fk_id_vartotojas
+      WHERE gi.fk_id_grupe = ?
+      ORDER BY gi.sukurta DESC
+      `,
+      [groupId]
+    );
+
+    res.json({ activities: rows });
+  } catch (err) {
+    console.error("Klaida gaunant grupės istoriją:", err);
+    res.status(500).json({ message: "Serverio klaida gaunant grupės istoriją" });
+  }
+});
 
 module.exports = router;
