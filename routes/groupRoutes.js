@@ -646,34 +646,38 @@ async function addGroupHistoryEntry(groupId, userId, type, description, metadata
 // GRUPĖS ISTORIJA
 // GET /api/groups/:groupId/history
 // =====================================================
-router.get('/api/groups/:groupId/history', async (req, res) => {
-  const { groupId } = req.params;
+
+// GET /api/groups/:groupId/history – konkrečios grupės istorija
+router.get("/api/groups/:groupId/history", async (req, res) => {
+  const { groupId } = req.params
 
   try {
     const [rows] = await db.query(
       `
       SELECT
-        gi.id_istorija      AS id,
-        gi.fk_id_grupe      AS groupId,
-        gi.fk_id_vartotojas AS userId,
-        COALESCE(CONCAT(v.vardas, ' ', v.pavarde), 'Sistema') AS userName,
-        gi.tipas            AS type,
-        gi.aprasymas        AS description,
-        gi.sukurta          AS timestamp,
-        gi.metadata         AS metadata
+        gi.id_istorija              AS id,
+        gi.fk_id_grupe              AS groupId,
+        gi.fk_id_vartotojas         AS userId,
+        CONCAT(v.vardas, ' ', v.pavarde) AS userName,
+        v.avatar_url                AS userAvatar,
+        gi.tipas                    AS type,
+        gi.aprasymas                AS description,
+        gi.sukurta                  AS timestamp,
+        gi.metadata                 AS metadata
       FROM Grupes_istorija gi
-      LEFT JOIN Vartotojai v ON v.id_vartotojas = gi.fk_id_vartotojas
+      LEFT JOIN Vartotojai v 
+        ON v.id_vartotojas = gi.fk_id_vartotojas
       WHERE gi.fk_id_grupe = ?
       ORDER BY gi.sukurta DESC
       `,
       [groupId]
-    );
+    )
 
-    res.json({ activities: rows });
+    res.json({ activities: rows })
   } catch (err) {
-    console.error("Klaida gaunant grupės istoriją:", err);
-    res.status(500).json({ message: "Serverio klaida gaunant grupės istoriją" });
+    console.error("Get group history error:", err)
+    res.status(500).json({ message: "Nepavyko gauti grupės istorijos" })
   }
-});
+})
 
 module.exports = router;
