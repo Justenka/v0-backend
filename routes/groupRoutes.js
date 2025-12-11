@@ -32,8 +32,8 @@ router.post('/api/groups', async (req, res) => {
     // 2) Pridedam kūrėją į Grupes_nariai kaip owner/admin
     await db.query(
     `INSERT INTO Grupes_nariai 
-        (fk_id_grupe, fk_id_vartotojas, role, nario_busena, fk_id_sistemos_istorija)
-    VALUES (?, ?, ?, ?, NULL)`,
+        (fk_id_grupe, fk_id_vartotojas, role, nario_busena)
+    VALUES (?, ?, ?, ?)`,
     [groupId, ownerId, 3, 1]
     );
 
@@ -254,8 +254,8 @@ router.post("/api/groups/:groupId/members", async (req, res) => {
     // Įdedam į grupes_nariai kaip narį (role = 2)
     await db.query(
       `INSERT INTO Grupes_nariai
-         (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena, fk_id_sistemos_istorija)
-       VALUES (?, ?, CURDATE(), 2, 1, NULL)`,
+         (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena)
+       VALUES (?, ?, CURDATE(), 2, 1)`,
       [groupId, userId]
     )
 

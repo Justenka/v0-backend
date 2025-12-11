@@ -260,7 +260,7 @@ async function autoSimplifyGroupDebts(groupId, connection = null) {
       await conn.query(
         `INSERT INTO Skolos_dalys 
           (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, delspinigiai, vaidmuo)
-         VALUES (?, ?, ?, 100.00, 0, 0, 2)`,
+         VALUES (?, ?, ?, 0, 1, 0, 2)`,
         [newDebtId, debt.to, debt.amount]
       );
     }
