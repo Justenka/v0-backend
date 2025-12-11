@@ -531,23 +531,6 @@ router.delete('/api/debts/:debtId', async (req, res) => {
 
     const { paidById, groupId, title, amount, valiutos_kodas } = debtRows[0];
 
-    // 2. (optional, bet logiška) patikrinam, ar useris turi teisę trinti:
-    // arba grupės adminas, arba tas, kuris sukūrė (paidById)
-    const [adminRows] = await connection.query(
-      `SELECT role 
-       FROM Grupes_nariai 
-       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
-      [groupId, userId]
-    );
-
-    const isAdmin = adminRows.length > 0 && Number(adminRows[0].role) === 1;
-    const isOwner = Number(paidById) === userId;
-
-    if (!isAdmin && !isOwner) {
-      await connection.rollback();
-      return res.status(403).json({ message: 'Neturite teisės ištrinti šios išlaidos' });
-    }
-
     // 3. Trinam dalis ir pačią skolą
     await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
     await connection.query(`DELETE FROM Skolos WHERE id_skola = ?`, [debtId]);
@@ -1153,6 +1136,10 @@ router.post('/api/payments', async (req, res) => {
     return res.status(400).json({ message: 'Trūksta privalomų laukų' });
   }
 
+  // Kas realiai atliko veiksmą (frontend gali siųsti x-user-id)
+  const actorRaw = req.header("x-user-id");
+  const actorId = actorRaw && !Number.isNaN(Number(actorRaw)) ? Number(actorRaw) : null;
+
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -1230,9 +1217,59 @@ router.post('/api/payments', async (req, res) => {
     }
 
     await connection.commit();
+
+    // ------------ ISTORIJA: payment_registered ------------
+    const paidAmount = amount - remainingAmount;
+    const historyUserId = actorId ?? Number(fromUserId);
+    const curCode = (currencyCode || "EUR").toUpperCase();
+
+    // Ištraukiam vardus/pavardes
+    let fromUserName = `Vartotojas #${fromUserId}`;
+    let toUserName = `Vartotojas #${toUserId}`;
+
+    try {
+      const [fromRows] = await db.query(
+        `SELECT vardas, pavarde FROM Vartotojai WHERE id_vartotojas = ?`,
+        [fromUserId]
+      );
+      if (fromRows.length > 0) {
+        fromUserName = `${fromRows[0].vardas} ${fromRows[0].pavarde}`;
+      }
+
+      const [toRows] = await db.query(
+        `SELECT vardas, pavarde FROM Vartotojai WHERE id_vartotojas = ?`,
+        [toUserId]
+      );
+      if (toRows.length > 0) {
+        toUserName = `${toRows[0].vardas} ${toRows[0].pavarde}`;
+      }
+    } catch (nameErr) {
+      console.error("Nepavyko gauti vartotojų vardų istorijai:", nameErr);
+    }
+
+    const descriptionText = `Mokėjimas užregistruotas: ${fromUserName} → ${toUserName}, suma ${paidAmount} ${curCode}.`;
+
+    await addGroupHistoryEntry(
+      Number(groupId),
+      Number(historyUserId),
+      "payment_registered",
+      descriptionText,
+      {
+        groupId: Number(groupId),
+        fromUserId: Number(fromUserId),
+        toUserId: Number(toUserId),
+        amount: paidAmount,
+        currencyCode: curCode,
+        note: note || null,
+        affectedPartsCount: parts.length
+      }
+    );
+
+    // -------------------------------------------------------
+
     res.status(201).json({
       message: 'Mokėjimas užregistruotas',
-      amountPaid: amount - remainingAmount
+      amountPaid: paidAmount
     });
   } catch (err) {
     await connection.rollback();
