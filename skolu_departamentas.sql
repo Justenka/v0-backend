@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 11, 2025 at 05:16 PM
+-- Generation Time: Dec 11, 2025 at 08:41 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -127,7 +127,6 @@ CREATE TABLE `grupes_istorija` (
 CREATE TABLE `grupes_nariai` (
   `id_grupes_narys` int(11) NOT NULL,
   `fk_id_grupe` int(11) NOT NULL,
-  `fk_id_sistemos_istorija` int(11) DEFAULT NULL,
   `fk_id_vartotojas` int(11) NOT NULL,
   `prisijungimo_data` date NOT NULL,
   `role` int(11) NOT NULL,
@@ -176,7 +175,8 @@ INSERT INTO `kategorijos` (`id_kategorija`, `name`) VALUES
 (7, 'Įranga'),
 (8, 'Bendros išlaidos'),
 (9, 'Mokesčiai'),
-(10, 'Neplanuotos išlaidos');
+(10, 'Neplanuotos išlaidos'),
+(11, 'Išlyginimas');
 
 -- --------------------------------------------------------
 
@@ -264,6 +264,31 @@ CREATE TABLE `pranesimai` (
   `action_url` varchar(255) DEFAULT NULL,
   `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `pranesimai`
+--
+
+INSERT INTO `pranesimai` (`id_pranesimas`, `fk_id_vartotojas`, `tipas`, `pavadinimas`, `tekstas`, `nuskaityta`, `sukurta`, `action_url`, `metadata`) VALUES
+(37, 8, 'group_message', 'Nauja žinutė grupėje \"fff\"', 'test1 test1: aa', 1, '2025-12-11 18:37:27', '/groups/25?tab=chat', '{\"type\":\"group_message\",\"groupId\":25,\"messageId\":54,\"senderId\":9}'),
+(38, 8, 'group_message', 'Nauja žinutė grupėje \"fff\"', 'test1 test1: aa', 1, '2025-12-11 18:37:47', '/groups/25?tab=chat', '{\"type\":\"group_message\",\"groupId\":25,\"messageId\":55,\"senderId\":9}'),
+(39, 8, 'friend_request', 'Naujas draugo kvietimas', 'test1 test1 pakvietė jus draugauti', 1, '2025-12-11 18:38:06', '/friends', NULL),
+(40, 8, 'group_message', 'Nauja žinutė grupėje \"fff\"', 'test1 test1: aa', 1, '2025-12-11 18:39:07', '/groups/25?tab=chat', '{\"type\":\"group_message\",\"groupId\":25,\"messageId\":57,\"senderId\":9}'),
+(41, 8, 'friend_request', 'Naujas draugo kvietimas', 'test1 test1 pakvietė jus draugauti', 1, '2025-12-11 18:56:24', '/friends', NULL),
+(42, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „123“ (123 EUR).', 0, '2025-12-11 21:01:54', '/groups/25', NULL),
+(43, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „1345“ (123 EUR).', 0, '2025-12-11 21:02:48', '/groups/25', NULL),
+(44, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „testas“ (100 EUR).', 0, '2025-12-11 21:11:34', '/groups/25', NULL),
+(45, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „test“ (100 EUR).', 0, '2025-12-11 21:12:09', '/groups/25', NULL),
+(46, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „kkkkkk“ (15 EUR).', 0, '2025-12-11 21:13:16', '/groups/25', NULL),
+(47, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „ikiiii“ (5 EUR).', 0, '2025-12-11 21:13:49', '/groups/25', NULL),
+(48, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „aaaa“ (15 EUR).', 0, '2025-12-11 21:14:54', '/groups/25', NULL),
+(49, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „aaaaaaaaaa“ (150 EUR).', 0, '2025-12-11 21:15:31', '/groups/25', NULL),
+(50, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „asd“ (100 EUR).', 0, '2025-12-11 21:23:00', '/groups/25', NULL),
+(51, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „aaaa“ (100 EUR).', 0, '2025-12-11 21:23:11', '/groups/25', NULL),
+(52, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „asd“ (15 EUR).', 0, '2025-12-11 21:24:09', '/groups/25', NULL),
+(53, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „fdgh“ (150 EUR).', 0, '2025-12-11 21:24:29', '/groups/25', NULL),
+(54, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „44“ (100 EUR).', 0, '2025-12-11 21:25:01', '/groups/25', NULL),
+(55, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „4444“ (200 EUR).', 0, '2025-12-11 21:25:23', '/groups/25', NULL);
 
 -- --------------------------------------------------------
 
@@ -508,13 +533,6 @@ CREATE TABLE `vartotoju_draugystes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `vartotoju_draugystes`
---
-
-INSERT INTO `vartotoju_draugystes` (`id_draugyste`, `fk_requester_id`, `fk_addressee_id`, `status`, `created_at`, `updated_at`) VALUES
-(3, 10, 9, 'accepted', '2025-12-03 19:16:43', '2025-12-07 20:08:11');
-
---
 -- Indexes for dumped tables
 --
 
@@ -569,7 +587,6 @@ ALTER TABLE `grupes_istorija`
 ALTER TABLE `grupes_nariai`
   ADD PRIMARY KEY (`id_grupes_narys`),
   ADD KEY `fk_id_grupe` (`fk_id_grupe`),
-  ADD KEY `fk_id_sistemos_istorija` (`fk_id_sistemos_istorija`),
   ADD KEY `fk_id_vartotojas` (`fk_id_vartotojas`),
   ADD KEY `role` (`role`),
   ADD KEY `nario_busena` (`nario_busena`);
@@ -716,7 +733,7 @@ ALTER TABLE `vartotoju_draugystes`
 -- AUTO_INCREMENT for table `asmeniniai_pranesimai`
 --
 ALTER TABLE `asmeniniai_pranesimai`
-  MODIFY `id_asmeninis_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=93;
+  MODIFY `id_asmeninis_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=96;
 
 --
 -- AUTO_INCREMENT for table `ataskaitos`
@@ -740,31 +757,31 @@ ALTER TABLE `delspinigiai`
 -- AUTO_INCREMENT for table `grupes`
 --
 ALTER TABLE `grupes`
-  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
+  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `grupes_istorija`
 --
 ALTER TABLE `grupes_istorija`
-  MODIFY `id_istorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
+  MODIFY `id_istorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=91;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
 --
 ALTER TABLE `grupes_nariai`
-  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 
 --
 -- AUTO_INCREMENT for table `grupes_zinutes`
 --
 ALTER TABLE `grupes_zinutes`
-  MODIFY `id_grupes_zinute` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=54;
+  MODIFY `id_grupes_zinute` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT for table `kategorijos`
 --
 ALTER TABLE `kategorijos`
-  MODIFY `id_kategorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id_kategorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `kvietimai`
@@ -782,7 +799,7 @@ ALTER TABLE `kvietimo_busenos`
 -- AUTO_INCREMENT for table `mokejimai`
 --
 ALTER TABLE `mokejimai`
-  MODIFY `id_mokejimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_mokejimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `nariu_busenos`
@@ -794,7 +811,7 @@ ALTER TABLE `nariu_busenos`
 -- AUTO_INCREMENT for table `pranesimai`
 --
 ALTER TABLE `pranesimai`
-  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
 
 --
 -- AUTO_INCREMENT for table `pranesimo_busenos`
@@ -818,13 +835,13 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT for table `skolos`
 --
 ALTER TABLE `skolos`
-  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
+  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `skolos_dalys`
 --
 ALTER TABLE `skolos_dalys`
-  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=77;
 
 --
 -- AUTO_INCREMENT for table `skolu_statusai`
@@ -860,7 +877,7 @@ ALTER TABLE `vartotojai`
 -- AUTO_INCREMENT for table `vartotoju_draugystes`
 --
 ALTER TABLE `vartotoju_draugystes`
-  MODIFY `id_draugyste` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id_draugyste` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- Constraints for dumped tables
@@ -904,7 +921,6 @@ ALTER TABLE `grupes_istorija`
 --
 ALTER TABLE `grupes_nariai`
   ADD CONSTRAINT `grupes_nariai_ibfk_1` FOREIGN KEY (`fk_id_grupe`) REFERENCES `grupes` (`id_grupe`),
-  ADD CONSTRAINT `grupes_nariai_ibfk_2` FOREIGN KEY (`fk_id_sistemos_istorija`) REFERENCES `sistemos_istorijos` (`id_sistemos_istorija`),
   ADD CONSTRAINT `grupes_nariai_ibfk_3` FOREIGN KEY (`fk_id_vartotojas`) REFERENCES `vartotojai` (`id_vartotojas`),
   ADD CONSTRAINT `grupes_nariai_ibfk_4` FOREIGN KEY (`role`) REFERENCES `roles` (`id_role`),
   ADD CONSTRAINT `grupes_nariai_ibfk_5` FOREIGN KEY (`nario_busena`) REFERENCES `nariu_busenos` (`id_nario_busena`);
