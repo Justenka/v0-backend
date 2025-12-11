@@ -1,6 +1,7 @@
 // routes/debtRoutes.js
 const express = require('express');
 const db = require('../db');
+const { addGroupHistoryEntry } = require('../lib/groupHistory');
 
 const router = express.Router();
 
@@ -251,6 +252,9 @@ router.post('/api/debts', async (req, res) => {
     return res.status(400).json({ message: 'Trūksta privalomų laukų' });
   }
 
+  const actorRaw = req.header("x-user-id");
+  const actorId = actorRaw && !Number.isNaN(Number(actorRaw)) ? Number(actorRaw) : null;
+
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -401,6 +405,22 @@ router.post('/api/debts', async (req, res) => {
 
     await connection.commit();
 
+    const historyUserId = actorId ?? Number(paidByUserId);
+
+    await addGroupHistoryEntry(
+      Number(groupId),
+      historyUserId,
+      "expense_added",
+      `Išlaida "${title}" pridėta (${originalAmount} ${currencyCode}).`,
+      {
+        debtId,
+        amount: originalAmount,
+        currencyCode,
+        paidByUserId: Number(paidByUserId),
+        createdByUserId: historyUserId,
+      }
+    );
+
     // *** AUTOMATINIS SKOLŲ IŠLYGINIMAS ***
     console.log(`\n[AUTO-IŠLYGINIMAS] Pradedamas skolų išlyginimas grupėje ${groupId}...`);
     try {
@@ -477,21 +497,28 @@ router.get('/api/categories-by-group/:groupId', async (req, res) => {
 router.delete('/api/debts/:debtId', async (req, res) => {
   const { debtId } = req.params;
 
-  // Gauname userId iš užklausos - galite naudoti authMiddleware arba siųsti per body/header
-  // Šiuo atveju tikriname per header'į arba query parametrą
-  const userId = req.headers['x-user-id'] || req.query.userId;
-
-  if (!userId) {
+  // userId / actor iš headerio arba query
+  const userIdRaw = req.headers['x-user-id'] || req.query.userId;
+  if (!userIdRaw) {
     return res.status(401).json({ message: 'Neautorizuotas - userId nėra' });
   }
 
+  const userId = Number(userIdRaw);
+  const actorId = !Number.isNaN(userId) ? userId : null;
+
   const connection = await db.getConnection();
+
   try {
     await connection.beginTransaction();
 
-    // 1. Gauname skolos info + kas mokėjo + grupę
+    // 1. Pasiimam skolos info, kad būtų ką įrašyti į istoriją
     const [debtRows] = await connection.query(
-      `SELECT s.fk_id_vartotojas AS paidById, s.fk_id_grupe AS groupId
+      `SELECT 
+         s.fk_id_vartotojas AS paidById,
+         s.fk_id_grupe   AS groupId,
+         s.pavadinimas   AS title,
+         s.suma          AS amount,
+         s.valiutos_kodas AS valiutos_kodas
        FROM Skolos s
        WHERE s.id_skola = ?`,
       [debtId]
@@ -502,20 +529,53 @@ router.delete('/api/debts/:debtId', async (req, res) => {
       return res.status(404).json({ message: 'Skola nerasta' });
     }
 
-    const { paidById, groupId } = debtRows[0];
+    const { paidById, groupId, title, amount, valiutos_kodas } = debtRows[0];
 
-    // 2. Patikriname ar vartotojas yra adminas grupėje
+    // 2. (optional, bet logiška) patikrinam, ar useris turi teisę trinti:
+    // arba grupės adminas, arba tas, kuris sukūrė (paidById)
     const [adminRows] = await connection.query(
-      `SELECT role FROM Grupes_nariai 
+      `SELECT role 
+       FROM Grupes_nariai 
        WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
       [groupId, userId]
     );
 
-    // 3. Triname susijusias dalis ir pačią skolą
+    const isAdmin = adminRows.length > 0 && Number(adminRows[0].role) === 1;
+    const isOwner = Number(paidById) === userId;
+
+    if (!isAdmin && !isOwner) {
+      await connection.rollback();
+      return res.status(403).json({ message: 'Neturite teisės ištrinti šios išlaidos' });
+    }
+
+    // 3. Trinam dalis ir pačią skolą
     await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
     await connection.query(`DELETE FROM Skolos WHERE id_skola = ?`, [debtId]);
 
     await connection.commit();
+
+    // 4. ĮRAŠOM Į ISTORIJĄ (po commit, kad nebūtų deadlockų)
+    const historyUserId = actorId ?? Number(paidById);
+
+    const currencyCode =
+      valiutos_kodas === 1 ? 'EUR' :
+      valiutos_kodas === 2 ? 'USD' :
+      valiutos_kodas === 3 ? 'PLN' : 'UNK';
+
+    await addGroupHistoryEntry(
+      Number(groupId),
+      historyUserId,
+      "expense_deleted",
+      `Išlaida "${title}" panaikinta (${Number(amount)} ${currencyCode}).`,
+      {
+        debtId: Number(debtId),
+        amount: Number(amount),
+        currencyCode,
+        paidByUserId: Number(paidById),
+        deletedByUserId: historyUserId,
+      }
+    );
+
     res.json({ message: 'Išlaida sėkmingai ištrinta' });
   } catch (err) {
     await connection.rollback();

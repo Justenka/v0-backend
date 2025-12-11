@@ -1,6 +1,7 @@
 // routes/groupRoutes.js
 const express = require('express');
 const db = require('../db');
+const { addGroupHistoryEntry } = require('../lib/groupHistory');
 // jei turi auth middleware, vėliau:
 // const auth = require('../middleware/authMiddleware');
 
@@ -346,10 +347,11 @@ router.get('/api/debt-parts/:debtId', async (req, res) => {
 
 // DELETE /api/groups/:groupId/members/:memberId – pašalinti narį
 router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
-  const { groupId, memberId } = req.params;
+  const { groupId, memberId } = req.params
+  const actorId = Number(req.header("x-user-id")) || null
 
   try {
-    // Pasiimam info apie narį (gražesniam istorijos tekstui)
+    // Pasiimam info apie pašalinamą narį
     const [userRows] = await db.query(
       `SELECT vardas, pavarde, el_pastas 
        FROM Vartotojai 
@@ -361,38 +363,38 @@ router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
     const memberName = member
       ? `${member.vardas} ${member.pavarde || ""}`.trim()
       : `ID ${memberId}`
+    const memberEmail = member ? member.el_pastas : null
 
-    // Pažymėti kaip neaktyvų
+    // Pažymim kaip neaktyvų
     const [result] = await db.query(
       "UPDATE Grupes_nariai SET nario_busena = 3 WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?",
       [groupId, memberId]
-    );
+    )
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Narys nerastas" });
+      return res.status(404).json({ message: "Narys nerastas" })
     }
 
-    // === ČIA – ISTORIJOS ĮRAŠAS ===
+    // Istorija – kas ką pašalino
     await addGroupHistoryEntry(
       Number(groupId),
-      Number(memberId),                // vėl – dabar rašom tą narį. 
-                                       // Vėliau gali pakeisti į "kas pašalino" (admino ID iš auth).
+      actorId, // tas, kas daro veiksmą
       "member_removed",
-      `Narys "${memberName}" pašalintas iš grupės.`,
+      `Pašalintas narys "${memberName}".`,
       {
         memberId: Number(memberId),
-        memberEmail: member?.el_pastas ?? null,
+        memberName,
+        memberEmail,
       }
     )
-    // =============================
 
-    res.json({ success: true });
+    res.json({ success: true })
   } catch (err) {
-    console.error("Remove member error:", err);
-    const message = err.sqlMessage || err.message || "Serverio klaida";
-    res.status(500).json({ message });
+    console.error("Remove member error:", err)
+    const message = err.sqlMessage || err.message || "Serverio klaida"
+    res.status(500).json({ message })
   }
-});
+})
 
 // DELETE /api/groups/:id – ištrinti grupę ir susijusius duomenis
 router.delete("/api/groups/:id", async (req, res) => {
@@ -663,24 +665,6 @@ async function createGroupMessageNotifications(groupId, senderId, messageRow) {
   } catch (err) {
     console.error("Klaida kuriant grupės žinučių pranešimus:", err);
     // notifai – ne kritiniai, request'o nenukertam
-  }
-}
-
-// Helperis – įrašyti grupės istorijos įrašą
-async function addGroupHistoryEntry(groupId, userId, type, description, metadata = null) {
-  try {
-    const metaJson = metadata ? JSON.stringify(metadata) : null;
-
-    await db.query(
-      `
-      INSERT INTO Grupes_istorija
-        (fk_id_grupe, fk_id_vartotojas, tipas, aprasymas, metadata)
-      VALUES (?, ?, ?, ?, ?)
-      `,
-      [groupId, userId ?? null, type, description, metaJson]
-    );
-  } catch (err) {
-    console.error("Klaida rašant Grupes_istorija:", err);
   }
 }
 
