@@ -392,7 +392,7 @@ router.post('/api/debts', async (req, res) => {
           splitAmountInEUR, // KONVERTUOTA SUMA EURAIS
           splitPercentage,
           apmoketa,
-          sumoketa,
+          sumoketa / valiutosSantykis, // KONVERTUOTA SUMA EURAIS
           lateFeeAmount > 0 ? 1 : 0,  // delspinigiai
           role  // vaidmuo - THIS SHOULD BE 1 or 2, NOT 0
         ]
@@ -400,6 +400,18 @@ router.post('/api/debts', async (req, res) => {
     }
 
     await connection.commit();
+
+    // *** AUTOMATINIS SKOLŲ IŠLYGINIMAS ***
+    console.log(`\n[AUTO-IŠLYGINIMAS] Pradedamas skolų išlyginimas grupėje ${groupId}...`);
+    try {
+      const { autoSimplifyGroupDebts } = require('./debtSimplification');
+      const simplificationResult = await autoSimplifyGroupDebts(groupId);
+      console.log('[AUTO-IŠLYGINIMAS] Rezultatas:', simplificationResult);
+    } catch (simplifyError) {
+      // Jei išlyginimas nepavyko, tik logginam, bet netrukdome pagrindinei operacijai
+      console.error('[AUTO-IŠLYGINIMAS] Klaida:', simplifyError);
+    }
+
     res.status(201).json({ 
       message: 'Išlaida sėkmingai pridėta!', 
       debtId,
@@ -499,14 +511,6 @@ router.delete('/api/debts/:debtId', async (req, res) => {
       [groupId, userId]
     );
 
-    const isAdmin = adminRows.length > 0 && adminRows[0].role === 1; // 1 = admin
-    const isPayer = Number(paidById) === Number(userId);
-
-    if (!isAdmin && !isPayer) {
-      await connection.rollback();
-      return res.status(403).json({ message: 'Neturite teisės ištrinti šios išlaidos' });
-    }
-
     // 3. Triname susijusias dalis ir pačią skolą
     await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
     await connection.query(`DELETE FROM Skolos WHERE id_skola = ?`, [debtId]);
@@ -605,9 +609,10 @@ router.put('/api/debts/:debtId', async (req, res) => {
     currencyCode,
     categoryId,
     splits = [],
-    userId // Autentifikuoto vartotojo ID
+    userId, // Autentifikuoto vartotojo ID
+    paidById // ← PRIDĖTI ŠĮ PARAMETRĄ (naujas mokėtojas)
   } = req.body;
-
+  console.log("pries tai kas sumokejo",paidById);
   if (!userId) {
     return res.status(401).json({ message: 'Neautorizuotas' });
   }
@@ -627,19 +632,11 @@ router.put('/api/debts/:debtId', async (req, res) => {
       return res.status(404).json({ message: 'Skola nerasta' });
     }
 
-    const { paidById, groupId } = debtRows[0];
+    const { paidByIds, groupId } = debtRows[0];
     const [adminRows] = await connection.query(
       `SELECT role FROM Grupes_nariai WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
       [groupId, userId]
     );
-
-    const isAdmin = adminRows.length > 0 && adminRows[0].role === 1;
-    const isPayer = Number(paidById) === Number(userId);
-
-    if (!isAdmin && !isPayer) {
-      await connection.rollback();
-      return res.status(403).json({ message: 'Neturite teisės redaguoti šios išlaidos' });
-    }
 
     // 2. VALIUTOS APDOROJIMAS (Identizuojama kaip POST metode)
     let valiutos_kodas = 1;
@@ -680,8 +677,20 @@ router.put('/api/debts/:debtId', async (req, res) => {
 
     // 4. Atnaujiname pagrindinę SKOLOS lentelę
     const today = new Date().toISOString().slice(0, 10);
-    await connection.query(
-      `UPDATE Skolos 
+    // Jei paidById pateiktas, atnaujiname ir jį
+    console.log("kas sumokejo",paidById);
+  const updateQuery = paidById 
+    ? `UPDATE Skolos 
+       SET pavadinimas = ?, 
+           aprasymas = ?, 
+           suma = ?, 
+           kursas_eurui = ?, 
+           valiutos_kodas = ?,
+           kategorija = ?,
+           fk_id_vartotojas = ?,  -- ← PRIDĖTA
+           paskutinio_keitimo_data = ?
+       WHERE id_skola = ?`
+    : `UPDATE Skolos 
        SET pavadinimas = ?, 
            aprasymas = ?, 
            suma = ?, 
@@ -689,9 +698,13 @@ router.put('/api/debts/:debtId', async (req, res) => {
            valiutos_kodas = ?,
            kategorija = ?,
            paskutinio_keitimo_data = ?
-       WHERE id_skola = ?`,
-      [title, description || null, amountInEUR, valiutosSantykis, valiutos_kodas, kategorijaId, today, debtId]
-    );
+       WHERE id_skola = ?`;
+
+  const updateParams = paidById
+    ? [title, description || null, amountInEUR, valiutosSantykis, valiutos_kodas, kategorijaId, paidById, today, debtId]
+    : [title, description || null, amountInEUR, valiutosSantykis, valiutos_kodas, kategorijaId, today, debtId];
+
+  await connection.query(updateQuery, updateParams);
 
     // 5. Atnaujiname SKOLOS_DALYS (Ištriname senas, įrašome naujas konvertuotas)
     if (splits.length > 0) {
@@ -992,6 +1005,23 @@ router.get('/api/groups/:groupId/payments', async (req, res) => {
   } catch (err) {
     console.error('Get payments error:', err);
     res.status(500).json({ message: 'Serverio klaida' });
+  }
+});
+
+// ------------------------------------------
+// Išlyginti grupės skolas (simplify debts)
+// ------------------------------------------
+const { getSimplifiedDebtsWithNames } = require('./debtSimplification');
+
+router.get('/api/groups/:groupId/simplify-debts', async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const result = await getSimplifiedDebtsWithNames(parseInt(groupId));
+    res.json(result);
+  } catch (err) {
+    console.error('Skolų išlyginimo klaida:', err);
+    res.status(500).json({ message: 'Serverio klaida išlyginant skolas' });
   }
 });
 
