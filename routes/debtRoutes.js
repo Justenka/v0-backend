@@ -421,6 +421,75 @@ router.post('/api/debts', async (req, res) => {
       }
     );
 
+    // Pranešimai grupės nariams apie naują išlaidą
+    try {
+      const groupIdNum = Number(groupId);
+
+      // 1) Pasiimam grupės pavadinimą
+      const [groupRows] = await db.query(
+        `SELECT pavadinimas 
+        FROM Grupes 
+        WHERE id_grupe = ?`,
+        [groupIdNum]
+      );
+      const groupName = groupRows[0]?.pavadinimas ?? "grupė";
+
+      // 2) Pasiimam, kas sukūrė išlaidą (vardas + pavardė)
+      const [actorRows] = await db.query(
+        `SELECT vardas, pavarde 
+        FROM Vartotojai 
+        WHERE id_vartotojas = ?`,
+        [historyUserId]
+      );
+      const creatorName = actorRows.length
+        ? `${actorRows[0].vardas} ${actorRows[0].pavarde}`.trim()
+        : "Vartotojas";
+
+      // 3) Visi grupės nariai + jų naujos_islaidos nustatymai
+      const [memberRows] = await db.query(
+        `
+        SELECT 
+          v.id_vartotojas,
+          v.vardas,
+          v.pavarde,
+          COALESCE(pn.naujos_islaidos, 1) AS naujos_islaidos
+        FROM Grupes_nariai gn
+        JOIN Vartotojai v ON v.id_vartotojas = gn.fk_id_vartotojas
+        LEFT JOIN Pranesimu_nustatymai pn
+          ON pn.fk_id_vartotojas = v.id_vartotojas
+        WHERE gn.fk_id_grupe = ?
+        `,
+        [groupIdNum]
+      );
+
+      for (const m of memberRows) {
+        const memberId = m.id_vartotojas;
+
+        // praleidžiam tą, kuris pats pridėjo išlaidą
+        if (memberId === historyUserId) continue;
+
+        // jei nustatymuose išjungta – skipinam
+        if (!m.naujos_islaidos) continue;
+
+        // 4) Sukuriam pranešimą Pranesimai lentelėje
+        await db.query(
+          `
+          INSERT INTO Pranesimai
+            (fk_id_vartotojas, tipas, pavadinimas, tekstas, action_url)
+          VALUES (?, 'new_expense', ?, ?, ?)
+          `,
+          [
+            memberId,
+            `Nauja išlaida grupėje "${groupName}"`,
+            `${creatorName} pridėjo išlaidą „${title}“ (${originalAmount} ${currencyCode}).`,
+            `/groups/${groupIdNum}`,
+          ]
+        );
+      }
+    } catch (notifErr) {
+      console.error("Nepavyko sukurti group_expense pranešimų:", notifErr);
+    }
+
     // *** AUTOMATINIS SKOLŲ IŠLYGINIMAS ***
     console.log(`\n[AUTO-IŠLYGINIMAS] Pradedamas skolų išlyginimas grupėje ${groupId}...`);
     try {
