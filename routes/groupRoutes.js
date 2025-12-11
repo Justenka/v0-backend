@@ -206,6 +206,7 @@ router.get('/api/groups/:id', async (req, res) => {
 router.post("/api/groups/:groupId/members", async (req, res) => {
   const { groupId } = req.params
   const { email, name } = req.body
+  const actorId = Number(req.header("x-user-id")) || null
 
   if (!email && !name) {
     return res.status(400).json({ message: "Nurodykite vardą arba el. paštą" })
@@ -255,6 +256,21 @@ router.post("/api/groups/:groupId/members", async (req, res) => {
          (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena, fk_id_sistemos_istorija)
        VALUES (?, ?, CURDATE(), 2, 1, NULL)`,
       [groupId, userId]
+    )
+
+    // === ČIA PRIDEDAM ISTORIJOS ĮRAŠĄ ===
+    const memberFullName = `${user.vardas} ${user.pavarde || ""}`.trim()
+
+    await addGroupHistoryEntry(
+      Number(groupId),
+      actorId,
+      "member_added",
+      `Pridėtas narys "${memberFullName}".`,
+      {
+        memberId: userId,
+        memberName: memberFullName,
+        memberEmail: user.el_pastas,
+      }
     )
 
     // Grąžinam atnaujintą grupę
@@ -333,6 +349,19 @@ router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
   const { groupId, memberId } = req.params;
 
   try {
+    // Pasiimam info apie narį (gražesniam istorijos tekstui)
+    const [userRows] = await db.query(
+      `SELECT vardas, pavarde, el_pastas 
+       FROM Vartotojai 
+       WHERE id_vartotojas = ?`,
+      [memberId]
+    )
+
+    const member = userRows[0] || null
+    const memberName = member
+      ? `${member.vardas} ${member.pavarde || ""}`.trim()
+      : `ID ${memberId}`
+
     // Pažymėti kaip neaktyvų
     const [result] = await db.query(
       "UPDATE Grupes_nariai SET nario_busena = 3 WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?",
@@ -342,6 +371,20 @@ router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Narys nerastas" });
     }
+
+    // === ČIA – ISTORIJOS ĮRAŠAS ===
+    await addGroupHistoryEntry(
+      Number(groupId),
+      Number(memberId),                // vėl – dabar rašom tą narį. 
+                                       // Vėliau gali pakeisti į "kas pašalino" (admino ID iš auth).
+      "member_removed",
+      `Narys "${memberName}" pašalintas iš grupės.`,
+      {
+        memberId: Number(memberId),
+        memberEmail: member?.el_pastas ?? null,
+      }
+    )
+    // =============================
 
     res.json({ success: true });
   } catch (err) {
@@ -638,7 +681,6 @@ async function addGroupHistoryEntry(groupId, userId, type, description, metadata
     );
   } catch (err) {
     console.error("Klaida rašant Grupes_istorija:", err);
-    // istorija neturėtų numušti pagrindinio veiksmo
   }
 }
 
