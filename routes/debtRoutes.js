@@ -658,7 +658,7 @@ router.get('/api/debts/:debtId', async (req, res) => {
 });
 
 // ------------------------------------------
-// UPDATE debt (edit transaction)
+// UPDATE debt (edit transaction) + istorija
 // ------------------------------------------
 router.put('/api/debts/:debtId', async (req, res) => {
   const { debtId } = req.params;
@@ -669,21 +669,31 @@ router.put('/api/debts/:debtId', async (req, res) => {
     currencyCode,
     categoryId,
     splits = [],
-    userId, // Autentifikuoto vartotojo ID
-    paidById // ← PRIDĖTI ŠĮ PARAMETRĄ (naujas mokėtojas)
+    userId,   // Autentifikuoto vartotojo ID (redaguojantis)
+    paidById  // Naujas mokėtojas (jei pakeistas)
   } = req.body;
-  console.log("pries tai kas sumokejo",paidById);
+
   if (!userId) {
     return res.status(401).json({ message: 'Neautorizuotas' });
   }
 
   const connection = await db.getConnection();
+
   try {
     await connection.beginTransaction();
 
-    // 1. Patikriname teises (ar mokėtojas, ar adminas)
-    const [debtRows] = await connection.query(
-      `SELECT fk_id_vartotojas AS paidById, fk_id_grupe AS groupId FROM Skolos WHERE id_skola = ?`,
+    // 1. Pasiimam DABARTINĘ skolos info prieš keitimą (istorijai)
+        const [debtRows] = await connection.query(
+      `SELECT 
+         fk_id_vartotojas AS oldPaidById,
+         fk_id_grupe      AS groupId,
+         pavadinimas      AS oldTitle,
+         suma             AS oldAmount,
+         valiutos_kodas   AS oldValiutosKodas,
+         kategorija       AS oldKategorijaId,
+         aprasymas        AS oldDescription
+       FROM Skolos
+       WHERE id_skola = ?`,
       [debtId]
     );
 
@@ -692,123 +702,335 @@ router.put('/api/debts/:debtId', async (req, res) => {
       return res.status(404).json({ message: 'Skola nerasta' });
     }
 
-    const { paidByIds, groupId } = debtRows[0];
-    const [adminRows] = await connection.query(
-      `SELECT role FROM Grupes_nariai WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
-      [groupId, userId]
-    );
+    const {
+      oldPaidById,
+      groupId,
+      oldTitle,
+      oldAmount,
+      oldValiutosKodas,
+      oldKategorijaId,
+      oldDescription
+    } = debtRows[0];
+    
+    // (jeigu norėtum tik admin / owner leidimo – čia galima tikrinti kaip delete route’e)
 
-    // 2. VALIUTOS APDOROJIMAS (Identizuojama kaip POST metode)
-    let valiutos_kodas = 1;
+    // 2. VALIUTOS APDOROJIMAS (kaip POST metode)
+    let valiutos_kodas = oldValiutosKodas || 1;
     let valiutosSantykis = 1.0;
 
     if (currencyCode) {
       const code = currencyCode.trim().toUpperCase();
       const currencyMap = { 'EUR': 1, 'USD': 2, 'PLN': 3 };
-      
+
       if (currencyMap[code]) {
         valiutos_kodas = currencyMap[code];
       } else {
         const [rows] = await connection.query(
-          `SELECT id_valiuta FROM valiutos WHERE UPPER(name) = ? LIMIT 1`, [code]
+          `SELECT id_valiuta FROM valiutos WHERE UPPER(name) = ? LIMIT 1`,
+          [code]
         );
-        if (rows.length > 0) valiutos_kodas = rows[0].id_valiuta;
+        if (rows.length > 0) {
+          valiutos_kodas = rows[0].id_valiuta;
+        }
       }
     }
 
-    // Gauname aktualų santykį iš DB
     const [vRows] = await connection.query(
-      `SELECT santykis FROM valiutos WHERE id_valiuta = ? LIMIT 1`, [valiutos_kodas]
+      `SELECT santykis FROM valiutos WHERE id_valiuta = ? LIMIT 1`,
+      [valiutos_kodas]
     );
-    if (vRows.length > 0) valiutosSantykis = parseFloat(vRows[0].santykis);
+    if (vRows.length > 0) {
+      valiutosSantykis = parseFloat(vRows[0].santykis);
+    }
 
-    // KONVERTUOJAME PAGRINDINĘ SUMĄ Į EUR
+    // 3. Nauja suma (kol kas kaip ir POST – nenaudojam realios konversijos)
     const originalAmount = parseFloat(amount);
     const amountInEUR = originalAmount;
 
-    // 3. Kategorijos apdorojimas
+    // 4. Kategorija
     let kategorijaId = null;
     if (categoryId) {
       const [catRows] = await connection.query(
-        `SELECT id_kategorija FROM kategorijos WHERE id_kategorija = ? LIMIT 1`, [parseInt(categoryId)]
+        `SELECT id_kategorija FROM kategorijos WHERE id_kategorija = ? LIMIT 1`,
+        [parseInt(categoryId)]
       );
-      if (catRows.length > 0) kategorijaId = parseInt(categoryId);
+      if (catRows.length > 0) {
+        kategorijaId = parseInt(categoryId);
+      }
     }
 
-    // 4. Atnaujiname pagrindinę SKOLOS lentelę
     const today = new Date().toISOString().slice(0, 10);
-    // Jei paidById pateiktas, atnaujiname ir jį
-    console.log("kas sumokejo",paidById);
-  const updateQuery = paidById 
-    ? `UPDATE Skolos 
-       SET pavadinimas = ?, 
-           aprasymas = ?, 
-           suma = ?, 
-           kursas_eurui = ?, 
-           valiutos_kodas = ?,
-           kategorija = ?,
-           fk_id_vartotojas = ?,  -- ← PRIDĖTA
-           paskutinio_keitimo_data = ?
-       WHERE id_skola = ?`
-    : `UPDATE Skolos 
-       SET pavadinimas = ?, 
-           aprasymas = ?, 
-           suma = ?, 
-           kursas_eurui = ?, 
-           valiutos_kodas = ?,
-           kategorija = ?,
-           paskutinio_keitimo_data = ?
-       WHERE id_skola = ?`;
 
-  const updateParams = paidById
-    ? [title, description || null, amountInEUR, valiutosSantykis, valiutos_kodas, kategorijaId, paidById, today, debtId]
-    : [title, description || null, amountInEUR, valiutosSantykis, valiutos_kodas, kategorijaId, today, debtId];
+    // 5. Atnaujinam SKOLOS įrašą
+    const newPaidById = paidById ? Number(paidById) : Number(oldPaidById);
 
-  await connection.query(updateQuery, updateParams);
+    const updateQuery = paidById
+      ? `UPDATE Skolos 
+         SET pavadinimas = ?, 
+             aprasymas = ?, 
+             suma = ?, 
+             kursas_eurui = ?, 
+             valiutos_kodas = ?,
+             kategorija = ?,
+             fk_id_vartotojas = ?, 
+             paskutinio_keitimo_data = ?
+         WHERE id_skola = ?`
+      : `UPDATE Skolos 
+         SET pavadinimas = ?, 
+             aprasymas = ?, 
+             suma = ?, 
+             kursas_eurui = ?, 
+             valiutos_kodas = ?,
+             kategorija = ?,
+             paskutinio_keitimo_data = ?
+         WHERE id_skola = ?`;
 
-    // 5. Atnaujiname SKOLOS_DALYS (Ištriname senas, įrašome naujas konvertuotas)
+    const updateParams = paidById
+      ? [
+          title,
+          description || null,
+          amountInEUR,
+          valiutosSantykis,
+          valiutos_kodas,
+          kategorijaId,
+          newPaidById,
+          today,
+          debtId
+        ]
+      : [
+          title,
+          description || null,
+          amountInEUR,
+          valiutosSantykis,
+          valiutos_kodas,
+          kategorijaId,
+          today,
+          debtId
+        ];
+
+    await connection.query(updateQuery, updateParams);
+
+    // 6. Atnaujinam SKOLOS_DALYS
     if (splits.length > 0) {
-      await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
+      await connection.query(
+        `DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`,
+        [debtId]
+      );
 
-      // Get the current paidById to determine who should be marked as paid
-      // Get the current paidById to determine who should be marked as paid
+      // Pasiimam dabar esamą fk_id_vartotojas kaip dabartinį mokėtoją
       const [currentDebt] = await connection.query(
         `SELECT fk_id_vartotojas AS paidById FROM Skolos WHERE id_skola = ?`,
         [debtId]
       );
-      const currentPaidById = currentDebt[0]?.paidById || paidById;
+      const currentPaidById =
+        currentDebt[0]?.paidById || newPaidById || oldPaidById;
 
-      // Insert new splits
       for (const split of splits) {
-        const role = Number(split.userId) === Number(currentPaidById) ? 2 : 1;
+        const role =
+          Number(split.userId) === Number(currentPaidById) ? 2 : 1;
 
         let splitAmount = split.amount || 0;
         let splitPercentage = split.percentage || 0;
 
-        // Procentų/Sumos balansas (pagal originalią sumą)
         if (splitPercentage > 0 && splitAmount === 0) {
           splitAmount = (originalAmount * splitPercentage) / 100;
         } else if (splitAmount > 0 && splitPercentage === 0) {
           splitPercentage = (splitAmount / originalAmount) * 100;
         }
 
-        // *** FIX: If vaidmuo is 2 (payer), mark as paid and set sumoketa = suma ***
         const apmoketa = role === 2 ? 1 : 0;
         const sumoketa = role === 2 ? splitAmount : 0;
         const splitAmountInEUR = splitAmount / valiutosSantykis;
 
-        console.log(`Debug: userId=${split.userId}, paidById=${currentPaidById}, role=${role}, apmoketa=${apmoketa}, sumoketa=${sumoketa}`);
-
         await connection.query(
           `INSERT INTO Skolos_dalys 
             (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, sumoketa, delspinigiai, vaidmuo)
-          VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-          [debtId, split.userId, splitAmountInEUR, splitPercentage, apmoketa, sumoketa, role]  // role should be 1 or 2
+           VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+          [
+            debtId,
+            split.userId,
+            splitAmountInEUR,
+            splitPercentage,
+            apmoketa,
+            sumoketa,
+            role
+          ]
         );
       }
     }
 
     await connection.commit();
+
+    // 7. ISTORIJA – po commit
+
+    // senos reikšmės
+    // 1) Pasiruošiam valiutas, sumas
+    const oldCurrencyCode =
+      oldValiutosKodas === 1
+        ? "EUR"
+        : oldValiutosKodas === 2
+        ? "USD"
+        : oldValiutosKodas === 3
+        ? "PLN"
+        : "UNK";
+
+    const newCurrencyCode =
+      valiutos_kodas === 1
+        ? "EUR"
+        : valiutos_kodas === 2
+        ? "USD"
+        : valiutos_kodas === 3
+        ? "PLN"
+        : "UNK";
+
+    const safeOldAmount = Number(oldAmount);
+    const safeNewAmount = Number(amountInEUR);
+    const displayOldTitle = oldTitle || title;
+
+    // 2) Išsitraukiam SENĄ ir NAUJĄ mokėtoją
+    let oldPayerName = null;
+    let newPayerName = null;
+
+    if (oldPaidById) {
+      const [rowsOldPayer] = await connection.query(
+        `SELECT vardas, pavarde FROM Vartotojai WHERE id_vartotojas = ?`,
+        [oldPaidById]
+      );
+      if (rowsOldPayer.length > 0) {
+        oldPayerName = `${rowsOldPayer[0].vardas} ${rowsOldPayer[0].pavarde}`;
+      }
+    }
+
+    if (newPaidById) {
+      const [rowsNewPayer] = await connection.query(
+        `SELECT vardas, pavarde FROM Vartotojai WHERE id_vartotojas = ?`,
+        [newPaidById]
+      );
+      if (rowsNewPayer.length > 0) {
+        newPayerName = `${rowsNewPayer[0].vardas} ${rowsNewPayer[0].pavarde}`;
+      }
+    }
+
+    // 3) Išsitraukiam SENĄ ir NAUJĄ kategorijos pavadinimą
+    let oldCategoryName = null;
+    let newCategoryName = null;
+
+    if (oldKategorijaId) {
+      const [rowsOldCat] = await connection.query(
+        `SELECT name FROM kategorijos WHERE id_kategorija = ?`,
+        [oldKategorijaId]
+      );
+      if (rowsOldCat.length > 0) {
+        oldCategoryName = rowsOldCat[0].name;
+      }
+    }
+
+    if (kategorijaId) {
+      const [rowsNewCat] = await connection.query(
+        `SELECT name FROM kategorijos WHERE id_kategorija = ?`,
+        [kategorijaId]
+      );
+      if (rowsNewCat.length > 0) {
+        newCategoryName = rowsNewCat[0].name;
+      }
+    }
+
+    // 4) Dabar lyginam laukus ir pildom changes
+    const changes = [];
+
+    const oldDescriptionSafe = oldDescription ?? null;
+
+    // pavadinimas
+    if (oldTitle !== title) {
+      changes.push({
+        field: "title",
+        label: "pavadinimas",
+        oldValue: oldTitle,
+        newValue: title,
+      });
+    }
+
+    // suma
+    if (!Number.isNaN(safeOldAmount) && safeOldAmount !== safeNewAmount) {
+      changes.push({
+        field: "amount",
+        label: "suma",
+        oldValue: `${safeOldAmount} ${oldCurrencyCode}`,
+        newValue: `${safeNewAmount} ${newCurrencyCode}`,
+      });
+    }
+
+    // valiuta (jei keitėsi, bet suma ta pati)
+    if (oldCurrencyCode !== newCurrencyCode && safeOldAmount === safeNewAmount) {
+      changes.push({
+        field: "currency",
+        label: "valiuta",
+        oldValue: oldCurrencyCode,
+        newValue: newCurrencyCode,
+      });
+    }
+
+    // mokėtojas – NAUJAS: rodome vardus, o ID meta-data
+    if (Number(oldPaidById) !== Number(newPaidById)) {
+      changes.push({
+        field: "paidByUserId",
+        label: "mokėtojas",
+        oldValue: oldPayerName || `Vartotojas #${oldPaidById}`,
+        newValue: newPayerName || `Vartotojas #${newPaidById}`,
+        oldId: Number(oldPaidById),
+        newId: Number(newPaidById),
+      });
+    }
+
+    // kategorija – NAUJA: rodom pavadinimus
+    if ((oldKategorijaId ?? null) !== (kategorijaId ?? null)) {
+      changes.push({
+        field: "categoryId",
+        label: "kategorija",
+        oldValue:
+          oldCategoryName ||
+          (oldKategorijaId != null ? `Kategorija #${oldKategorijaId}` : null),
+        newValue:
+          newCategoryName ||
+          (kategorijaId != null ? `Kategorija #${kategorijaId}` : null),
+        oldId: oldKategorijaId ?? null,
+        newId: kategorijaId ?? null,
+      });
+    }
+
+    // aprašymas
+    if ((oldDescriptionSafe || "") !== (description || "")) {
+      changes.push({
+        field: "description",
+        label: "aprašymas",
+        oldValue: oldDescriptionSafe,
+        newValue: description || null,
+      });
+    }
+
+    const descriptionText = changes.length
+      ? `Išlaida "${displayOldTitle}" atnaujinta (${changes
+          .map(
+            (c) =>
+              `${c.label}: ${c.oldValue ?? "nenurodyta"} → ${
+                c.newValue ?? "nenurodyta"
+              }`
+          )
+          .join(", ")}).`
+      : `Išlaida "${displayOldTitle}" atnaujinta.`;
+
+    await addGroupHistoryEntry(
+      Number(groupId),
+      Number(userId),
+      "expense_edited",
+      descriptionText,
+      {
+        debtId: Number(debtId),
+        editedByUserId: Number(userId),
+        changedFields: changes,
+      }
+    );
+
     res.json({ message: 'Išlaida atnaujinta', debtId, amountInEUR });
   } catch (err) {
     await connection.rollback();
