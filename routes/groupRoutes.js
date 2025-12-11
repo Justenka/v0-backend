@@ -33,7 +33,7 @@ router.post('/api/groups', async (req, res) => {
     `INSERT INTO Grupes_nariai 
         (fk_id_grupe, fk_id_vartotojas, role, nario_busena, fk_id_sistemos_istorija)
     VALUES (?, ?, ?, ?, NULL)`,
-    [groupId, ownerId, 1, 1]
+    [groupId, ownerId, 3, 1]
     );
 
     // 3) Parsiunčiam pilną grupės info (kaip groups-by-user)
@@ -155,24 +155,147 @@ router.get('/api/groups/:id', async (req, res) => {
          gn.role
        FROM Grupes_nariai gn
        JOIN Vartotojai v ON gn.fk_id_vartotojas = v.id_vartotojas
-       WHERE gn.fk_id_grupe = ?`,
+       WHERE gn.fk_id_grupe = ? AND gn.nario_busena = 1`,
       [id]
     )
 
-    res.json({
-      ...groupRows[0],
-      members: memberRows.map(m => ({
+    const mapRole = (roleInt) => {
+      switch (roleInt) {
+        case 3:
+          return "admin"   // grupės kūrėjas
+        case 2:
+          return "member"  // grupės narys
+        case 1:
+        default:
+          return "guest"   // svečias
+      }
+    }
+
+    const members = memberRows.map(m => {
+      const email =
+        m.email ||
+        `${m.name.toLowerCase().replace(/\s+/g, '.')}@example.com`
+
+      return {
         id: m.id,
         name: m.name,
-        email: m.email || `${m.name.toLowerCase()}@example.com`,
-        role: m.role === 1 ? "admin" : "member"
-      }))
+        email,
+        role: mapRole(m.role),
+      }
+    })
+
+    res.json({
+      ...groupRows[0],
+      members,
     })
   } catch (err) {
     console.error('Klaida gaunant grupę:', err)
     res.status(500).json({ message: 'Serverio klaida' })
   }
 });
+
+// POST /api/groups/:groupId/members – pridėti narį į grupę
+router.post("/api/groups/:groupId/members", async (req, res) => {
+  const { groupId } = req.params
+  const { email, name } = req.body
+
+  if (!email && !name) {
+    return res.status(400).json({ message: "Nurodykite vardą arba el. paštą" })
+  }
+
+  try {
+    let userRows = []
+
+    // Jei email yra — ieškome pagal email
+    if (email) {
+      const [rows] = await db.query(
+        "SELECT id_vartotojas, vardas, pavarde, el_pastas FROM Vartotojai WHERE el_pastas = ?",
+        [email]
+      )
+      userRows = rows
+    }
+
+    // Jei vardas yra — ieškome pagal vardą
+    if (!email && name) {
+      const [rows] = await db.query(
+        "SELECT id_vartotojas, vardas, pavarde, el_pastas FROM Vartotojai WHERE LOWER(vardas) = LOWER(?)",
+        [name]
+      )
+      userRows = rows
+    }
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "Vartotojas nerastas" })
+    }
+
+    const user = userRows[0]
+    const userId = user.id_vartotojas
+
+    // Tikrinam ar jau grupės narys
+    const [existing] = await db.query(
+      "SELECT id_grupes_narys FROM Grupes_nariai WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1",
+      [groupId, userId]
+    )
+
+    if (existing.length > 0) {
+      return res.status(400).json({ message: "Vartotojas jau yra grupėje" })
+    }
+
+    // Įdedam į grupes_nariai kaip narį (role = 2)
+    await db.query(
+      `INSERT INTO Grupes_nariai
+         (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena, fk_id_sistemos_istorija)
+       VALUES (?, ?, CURDATE(), 2, 1, NULL)`,
+      [groupId, userId]
+    )
+
+    // Grąžinam atnaujintą grupę
+    const [groupRows] = await db.query(
+      `SELECT 
+         g.*, 
+         v.vardas AS owner_vardas,
+         v.pavarde AS owner_pavarde
+       FROM Grupes g
+       JOIN Vartotojai v ON g.fk_id_vartotojas = v.id_vartotojas
+       WHERE g.id_grupe = ?`,
+      [groupId]
+    )
+
+    const [memberRows] = await db.query(
+      `SELECT 
+         v.id_vartotojas AS id,
+         v.vardas AS name,
+         v.el_pastas AS email,
+         gn.role
+       FROM Grupes_nariai gn
+       JOIN Vartotojai v ON gn.fk_id_vartotojas = v.id_vartotojas
+       WHERE gn.fk_id_grupe = ? AND gn.nario_busena = 1`,
+      [groupId]
+    )
+
+    const mapRole = (roleInt) => {
+      switch (roleInt) {
+        case 3: return "admin"
+        case 2: return "member"
+        default: return "guest"
+      }
+    }
+
+    const members = memberRows.map(m => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: mapRole(m.role)
+    }))
+
+    res.status(201).json({ ...groupRows[0], members })
+
+  } catch (err) {
+    console.error("Add member error:", err)
+    res.status(500).json({ message: err.message || "Serverio klaida" })
+  }
+});
+
 
 router.get('/api/debt-parts/:debtId', async (req, res) => {
   const { debtId } = req.params;
@@ -196,6 +319,57 @@ router.get('/api/debt-parts/:debtId', async (req, res) => {
     res.status(500).json({ message: 'Serverio klaida' });
   }
 });
+
+// DELETE /api/groups/:groupId/members/:memberId – pašalinti narį
+router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
+  const { groupId, memberId } = req.params;
+
+  try {
+    // Pažymėti kaip neaktyvų
+    const [result] = await db.query(
+      "UPDATE Grupes_nariai SET nario_busena = 3 WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?",
+      [groupId, memberId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Narys nerastas" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Remove member error:", err);
+    const message = err.sqlMessage || err.message || "Serverio klaida";
+    res.status(500).json({ message });
+  }
+});
+
+// DELETE /api/groups/:id – ištrinti grupę ir susijusius duomenis
+router.delete("/api/groups/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Ištrinam priklausomus įrašus (pagal FK struktūrą)
+    await db.query("DELETE FROM Grupes_zinutes WHERE fk_id_grupe = ?", [id]);
+    await db.query("DELETE FROM Skolos WHERE fk_id_grupe = ?", [id]);
+    await db.query("DELETE FROM Grupes_nariai WHERE fk_id_grupe = ?", [id]);
+
+    const [result] = await db.query(
+      "DELETE FROM Grupes WHERE id_grupe = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Grupė nerasta" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete group error:", err);
+    const message = err.sqlMessage || err.message || "Serverio klaida";
+    res.status(500).json({ message });
+  }
+});
+
 
 // ==================================================================
 // GRUPIŲ ŽINUTĖS
@@ -250,6 +424,7 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
   }
 
   try {
+    // 1) patikrinam, ar useris yra grupės narys
     const [memberRows] = await db.query(
       `
       SELECT id_grupes_narys
@@ -269,6 +444,7 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
 
     const groupMemberId = memberRows[0].id_grupes_narys;
 
+    // 2) įrašom žinutę
     const [insertResult] = await db.query(
       `
       INSERT INTO grupes_zinutes
@@ -280,7 +456,7 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
 
     const insertId = insertResult.insertId;
 
-    // 3) Parsiunčiam pilną įrašą su vardu/pavarde
+    // 3) pasiimam pilną eilutę (su senderName ir avataru)
     const [rows] = await db.query(
       `
       SELECT 
@@ -289,6 +465,7 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
         gz.fk_id_grupes_narys       AS groupMemberId,
         v.id_vartotojas             AS senderId,
         CONCAT(v.vardas, ' ', v.pavarde) AS senderName,
+        v.avatar_url                AS senderAvatar,
         gz.turinys                  AS content,
         gz.siuntimo_data            AS sentAt,
         gz.redaguota                AS edited,
@@ -301,14 +478,27 @@ router.post('/api/groups/:groupId/messages', async (req, res) => {
       LIMIT 1
       `,
       [insertId]
-    )
+    );
 
-    const msgRow = rows[0]
+    const msgRow = rows[0];
 
-    // Sukuriam pranešimus visiems kitiems grupės nariams
+    // 4) sukurti pranešimus kitiems grupės nariams (varpelis)
     await createGroupMessageNotifications(groupId, senderId, msgRow);
 
-    res.status(201).json(msgRow);
+    // 5) grąžinam žinutę frontendui
+    res.status(201).json({
+      id: msgRow.id,
+      groupId: msgRow.groupId,
+      groupMemberId: msgRow.groupMemberId,
+      senderId: msgRow.senderId,
+      senderName: msgRow.senderName,
+      senderAvatar: msgRow.senderAvatar || null,
+      content: msgRow.content,
+      sentAt: msgRow.sentAt,
+      edited: msgRow.edited,
+      editedAt: msgRow.editedAt,
+      deleted: msgRow.deleted,
+    });
   } catch (err) {
     console.error('Create group message error:', err);
     const message =
@@ -358,7 +548,7 @@ router.get("/api/grupes/:groupId/nariai/:userId/role", async (req, res) => {
 // === Helperis: kurti pranešimus, kai atsiranda nauja žinutė grupėje ===
 async function createGroupMessageNotifications(groupId, senderId, messageRow) {
   try {
-    // 1) Grupės pavadinimas
+    // 1) grupės pavadinimas
     const [groupRows] = await db.query(
       `SELECT pavadinimas 
        FROM Grupes 
@@ -367,14 +557,14 @@ async function createGroupMessageNotifications(groupId, senderId, messageRow) {
     );
     const groupName = groupRows[0]?.pavadinimas || "Grupė";
 
-    // 2) Visi KITI nariai (ne siuntėjas), kurie aktyvūs ir turi įjungtus "žinučių" pranešimus
+    // 2) visi KITI nariai, aktyvūs ir su įjungtais "žinutės" notifais
     const [userRows] = await db.query(
       `
       SELECT 
         v.id_vartotojas AS userId
       FROM Grupes_nariai gn
       JOIN Vartotojai v ON v.id_vartotojas = gn.fk_id_vartotojas
-      LEFT JOIN Pranesimu_nustatymai pn 
+      LEFT JOIN pranesimu_nustatymai pn 
         ON pn.fk_id_vartotojas = v.id_vartotojas
       WHERE gn.fk_id_grupe = ?
         AND v.id_vartotojas <> ?
@@ -384,7 +574,10 @@ async function createGroupMessageNotifications(groupId, senderId, messageRow) {
       [groupId, senderId]
     );
 
-    if (userRows.length === 0) return;
+    if (userRows.length === 0) {
+      // nėra kam siųsti – ok
+      return;
+    }
 
     const preview =
       (messageRow.content || "").length > 80
@@ -398,30 +591,27 @@ async function createGroupMessageNotifications(groupId, senderId, messageRow) {
       senderId: messageRow.senderId,
     });
 
-    const now = new Date();
-
-    const values = userRows.map((u) => [
-      u.userId,                               // fk_id_vartotojas
-      "group_message",                        // tipas
-      `Nauja žinutė grupėje "${groupName}"`,  // pavadinimas
-      `${messageRow.senderName}: ${preview}`, // tekstas
-      0,                                      // nuskaityta
-      now,                                    // sukurta
-      `/groups/${groupId}`,                   // action_url
-      metadata,                               // metadata (JSON)
-    ]);
-
-    await db.query(
-      `
-      INSERT INTO Pranesimai
-        (fk_id_vartotojas, tipas, pavadinimas, tekstas, nuskaityta, sukurta, action_url, metadata)
-      VALUES ?
-      `,
-      [values]
-    );
+    // 3) įrašom po vieną notifą kiekvienam vartotojui (stabilesnis variantas)
+    for (const u of userRows) {
+      await db.query(
+        `
+        INSERT INTO Pranesimai
+          (fk_id_vartotojas, tipas, pavadinimas, tekstas, nuskaityta, sukurta, action_url, metadata)
+        VALUES
+          (?, 'group_message', ?, ?, 0, NOW(), ?, ?)
+        `,
+        [
+          u.userId,
+          `Nauja žinutė grupėje "${groupName}"`,
+          `${messageRow.senderName}: ${preview}`,
+          `/groups/${groupId}?tab=chat`,
+          metadata,
+        ]
+      );
+    }
   } catch (err) {
     console.error("Klaida kuriant grupės žinučių pranešimus:", err);
-    // nekertam request'o – pranešimai nėra kritiniai
+    // notifai – ne kritiniai, request'o nenukertam
   }
 }
 
