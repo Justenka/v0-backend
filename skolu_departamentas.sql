@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 11, 2025 at 01:06 AM
+-- Generation Time: Dec 11, 2025 at 05:16 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -35,83 +35,6 @@ CREATE TABLE `asmeniniai_pranesimai` (
   `data` datetime NOT NULL,
   `pranesimo_busena` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `asmeniniai_pranesimai`
---
-
-INSERT INTO `asmeniniai_pranesimai` (`id_asmeninis_pranesimas`, `fk_id_vartotojas_siuntejas`, `fk_id_vartotojas_gavejas`, `turinys`, `data`, `pranesimo_busena`) VALUES
-(22, 8, 9, 'alio', '2025-12-03 19:18:46', 1),
-(23, 8, 10, 'labas', '2025-12-03 19:18:57', 1),
-(24, 8, 10, 'aaaaaaaaaa', '2025-12-03 19:18:59', 1),
-(25, 8, 10, 'LABAS', '2025-12-03 19:19:02', 1),
-(26, 8, 10, 'VEIKIA', '2025-12-03 19:19:04', 1),
-(27, 9, 8, 'alio', '2025-12-07 20:08:35', 1),
-(28, 8, 9, 'test', '2025-12-07 20:16:40', 1),
-(29, 9, 8, 'nereikia refresh', '2025-12-07 20:16:52', 1),
-(30, 9, 10, 'asd', '2025-12-07 20:17:10', 1),
-(31, 9, 8, 'vel test', '2025-12-07 20:24:07', 1),
-(32, 8, 9, 'veikia', '2025-12-07 20:24:28', 1),
-(33, 8, 9, 'test', '2025-12-07 20:24:55', 1),
-(34, 8, 9, '1', '2025-12-07 20:25:09', 1),
-(35, 8, 9, '32', '2025-12-07 20:25:10', 1),
-(36, 8, 9, '3', '2025-12-07 20:25:12', 1),
-(37, 8, 9, '1', '2025-12-07 20:25:34', 1),
-(38, 8, 9, '3', '2025-12-07 20:25:35', 1),
-(39, 9, 8, 'jo', '2025-12-07 20:25:48', 1),
-(40, 9, 8, 'dar test', '2025-12-07 20:57:21', 1),
-(41, 9, 8, 'a', '2025-12-07 21:00:40', 1),
-(42, 9, 8, 'a', '2025-12-07 21:00:41', 1),
-(43, 9, 8, 'a', '2025-12-07 21:00:41', 1),
-(44, 9, 8, 'a', '2025-12-07 21:00:41', 1),
-(45, 9, 8, 'a', '2025-12-07 21:00:42', 1),
-(46, 9, 8, 'a', '2025-12-07 21:00:42', 1),
-(47, 9, 8, 'a', '2025-12-07 21:00:42', 1),
-(48, 9, 8, 'a', '2025-12-07 21:00:42', 1),
-(49, 8, 9, 'test', '2025-12-07 21:06:38', 1),
-(50, 8, 9, 'asd', '2025-12-07 21:10:47', 1),
-(51, 8, 9, 'test', '2025-12-07 21:11:59', 1),
-(52, 8, 9, 'test', '2025-12-07 21:12:22', 1),
-(53, 8, 9, 'asd', '2025-12-07 21:22:33', 1),
-(54, 8, 9, 'asd', '2025-12-07 21:22:45', 1),
-(55, 8, 9, 'alio', '2025-12-07 21:22:53', 1),
-(56, 9, 8, 'nu', '2025-12-07 21:23:09', 1),
-(57, 8, 9, 'sw', '2025-12-07 21:25:37', 1),
-(58, 8, 9, 'sw', '2025-12-07 21:25:44', 1),
-(59, 8, 9, 'alio', '2025-12-07 21:25:50', 1),
-(60, 10, 8, 'sw', '2025-12-10 19:05:35', 1),
-(61, 9, 8, 'duhas', '2025-12-10 21:44:11', 1),
-(62, 9, 8, 'duhas', '2025-12-10 21:44:25', 1),
-(63, 9, 8, 'sw', '2025-12-10 21:44:57', 1),
-(64, 8, 9, 'dw', '2025-12-10 21:45:18', 1),
-(65, 8, 9, 'duhas', '2025-12-10 21:47:08', 1),
-(66, 8, 9, 'aa', '2025-12-10 21:59:19', 1),
-(67, 9, 8, 'aa', '2025-12-10 21:59:40', 1),
-(68, 9, 8, 'aa', '2025-12-10 21:59:53', 1),
-(69, 9, 8, 'aa', '2025-12-11 00:12:49', 1),
-(70, 8, 9, 'aa', '2025-12-11 00:14:55', 1),
-(71, 9, 8, 'aaaaaa', '2025-12-11 00:28:15', 1),
-(72, 9, 8, 'aaaa', '2025-12-11 00:28:17', 1),
-(73, 9, 8, 'aaaa', '2025-12-11 00:28:19', 1),
-(74, 9, 8, 'aaaaaa', '2025-12-11 00:28:20', 1),
-(75, 9, 8, 'aaaaa', '2025-12-11 00:28:21', 1),
-(76, 9, 8, 'aaaa', '2025-12-11 00:39:45', 1),
-(77, 9, 8, 'aaaa', '2025-12-11 00:39:48', 1),
-(78, 9, 8, 'aaaa', '2025-12-11 00:39:54', 1),
-(79, 9, 8, 'aaaa', '2025-12-11 00:39:54', 1),
-(80, 9, 8, 'aaaa', '2025-12-11 00:39:55', 1),
-(81, 9, 8, 'a', '2025-12-11 00:39:56', 1),
-(82, 9, 8, 'a', '2025-12-11 00:39:57', 1),
-(83, 9, 8, 'a', '2025-12-11 00:39:58', 1),
-(84, 9, 8, 'aaa', '2025-12-11 00:41:57', 1),
-(85, 9, 8, 'aaa', '2025-12-11 00:41:58', 1),
-(86, 9, 8, 'aaa', '2025-12-11 00:41:59', 1),
-(87, 9, 8, 'aaaa', '2025-12-11 00:46:17', 1),
-(88, 9, 8, 'aaa', '2025-12-11 00:46:20', 1),
-(89, 9, 8, 'aa', '2025-12-11 00:51:35', 1),
-(90, 9, 8, 'aa', '2025-12-11 01:10:12', 1),
-(91, 9, 8, 'aa', '2025-12-11 01:17:12', 1),
-(92, 9, 8, 'aa', '2025-12-11 02:05:43', 1);
 
 -- --------------------------------------------------------
 
@@ -179,13 +102,6 @@ CREATE TABLE `grupes` (
   `sukurimo_data` date NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `grupes`
---
-
-INSERT INTO `grupes` (`id_grupe`, `fk_id_vartotojas`, `pavadinimas`, `aprasas`, `sukurimo_data`) VALUES
-(18, 8, 'testinis', NULL, '2025-12-11');
-
 -- --------------------------------------------------------
 
 --
@@ -202,13 +118,6 @@ CREATE TABLE `grupes_istorija` (
   `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `grupes_istorija`
---
-
-INSERT INTO `grupes_istorija` (`id_istorija`, `fk_id_grupe`, `fk_id_vartotojas`, `tipas`, `aprasymas`, `sukurta`, `metadata`) VALUES
-(1, 18, 8, 'group_created', 'Grupė \"testinis\" sukurta.', '2025-12-11 02:05:04', '{\"ownerId\":8}');
-
 -- --------------------------------------------------------
 
 --
@@ -224,13 +133,6 @@ CREATE TABLE `grupes_nariai` (
   `role` int(11) NOT NULL,
   `nario_busena` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `grupes_nariai`
---
-
-INSERT INTO `grupes_nariai` (`id_grupes_narys`, `fk_id_grupe`, `fk_id_sistemos_istorija`, `fk_id_vartotojas`, `prisijungimo_data`, `role`, `nario_busena`) VALUES
-(14, 18, NULL, 8, '0000-00-00', 3, 1);
 
 -- --------------------------------------------------------
 
@@ -274,8 +176,7 @@ INSERT INTO `kategorijos` (`id_kategorija`, `name`) VALUES
 (7, 'Įranga'),
 (8, 'Bendros išlaidos'),
 (9, 'Mokesčiai'),
-(10, 'Neplanuotos išlaidos'),
-(11, 'Išlyginimas');
+(10, 'Neplanuotos išlaidos');
 
 -- --------------------------------------------------------
 
@@ -363,20 +264,6 @@ CREATE TABLE `pranesimai` (
   `action_url` varchar(255) DEFAULT NULL,
   `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `pranesimai`
---
-
-INSERT INTO `pranesimai` (`id_pranesimas`, `fk_id_vartotojas`, `tipas`, `pavadinimas`, `tekstas`, `nuskaityta`, `sukurta`, `action_url`, `metadata`) VALUES
-(19, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: sw', 0, '2025-12-11 00:49:54', '/groups/15', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":46,\"senderId\":9}'),
-(21, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 00:50:19', '/groups/15', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":47,\"senderId\":9}'),
-(23, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 01:09:16', '/groups/15?tab=chat', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":48,\"senderId\":9}'),
-(25, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 01:09:48', '/groups/15?tab=chat', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":49,\"senderId\":9}'),
-(27, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 01:09:54', '/groups/15?tab=chat', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":50,\"senderId\":9}'),
-(29, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 01:10:46', '/groups/15?tab=chat', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":51,\"senderId\":9}'),
-(31, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 01:13:35', '/groups/15?tab=chat', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":52,\"senderId\":9}'),
-(33, 10, 'group_message', 'Nauja žinutė grupėje \"testine\"', 'test1 test1: aa', 0, '2025-12-11 01:17:02', '/groups/15?tab=chat', '{\"type\":\"group_message\",\"groupId\":15,\"messageId\":53,\"senderId\":9}');
 
 -- --------------------------------------------------------
 
@@ -478,6 +365,7 @@ CREATE TABLE `skolos_dalys` (
   `suma` decimal(10,2) NOT NULL,
   `procentas` decimal(5,2) NOT NULL,
   `apmoketa` tinyint(1) NOT NULL,
+  `sumoketa` decimal(10,2) NOT NULL DEFAULT 0.00,
   `delspinigiai` tinyint(1) NOT NULL,
   `vaidmuo` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -574,8 +462,8 @@ CREATE TABLE `valiutos` (
 
 INSERT INTO `valiutos` (`id_valiuta`, `name`, `santykis`) VALUES
 (1, 'EUR', 1),
-(2, 'USD', 1.1634),
-(3, 'PLN', 4.2248);
+(2, 'USD', 1.1714),
+(3, 'PLN', 4.227);
 
 -- --------------------------------------------------------
 
@@ -600,7 +488,7 @@ CREATE TABLE `vartotojai` (
 --
 
 INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`, `avatar_url`) VALUES
-(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '6c428ba340fd91d746f5df7c2731118679e307bcf6617f9176adeb59ba20b8c6', '2025-12-03 15:40:21', '2025-12-10 21:51:15', 1, '/uploads/avatars/1765318585169-8471192.png'),
+(8, 'Kazkas', 'Kazkas', 'kazkas@example.com', '772948dd1fa8efce5ce24e25de13642d50757e997c1189340483a2d148adcf3c', '2025-12-03 15:40:21', '2025-12-11 02:37:20', 1, '/uploads/avatars/1765318585169-8471192.png'),
 (9, 'test1', 'test1', 'test1@example.com', '744ea9ec6fa0a83e9764b4e323d5be6b55a5accfc7fe4c08eab6a8de1fca4855', '2025-12-03 18:39:07', '2025-12-10 21:59:32', 1, '/uploads/avatars/1765318616988-507908848.png'),
 (10, 'test2', 'test2', 'test2@example.com', '759cfde265aaddb6f728ed08d97862bbd9b56fd39de97a049c640b4c5b70aac9', '2025-12-03 19:16:25', '2025-12-10 19:04:40', 1, '/uploads/avatars/1765319419696-742828989.png');
 
@@ -624,9 +512,7 @@ CREATE TABLE `vartotoju_draugystes` (
 --
 
 INSERT INTO `vartotoju_draugystes` (`id_draugyste`, `fk_requester_id`, `fk_addressee_id`, `status`, `created_at`, `updated_at`) VALUES
-(3, 10, 9, 'accepted', '2025-12-03 19:16:43', '2025-12-07 20:08:11'),
-(4, 10, 8, 'accepted', '2025-12-03 19:16:53', '2025-12-03 19:17:01'),
-(13, 9, 8, 'accepted', '2025-12-11 01:20:43', '2025-12-11 01:20:50');
+(3, 10, 9, 'accepted', '2025-12-03 19:16:43', '2025-12-07 20:08:11');
 
 --
 -- Indexes for dumped tables
@@ -854,19 +740,19 @@ ALTER TABLE `delspinigiai`
 -- AUTO_INCREMENT for table `grupes`
 --
 ALTER TABLE `grupes`
-  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id_grupe` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `grupes_istorija`
 --
 ALTER TABLE `grupes_istorija`
-  MODIFY `id_istorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_istorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
 --
 ALTER TABLE `grupes_nariai`
-  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `grupes_zinutes`
@@ -896,7 +782,7 @@ ALTER TABLE `kvietimo_busenos`
 -- AUTO_INCREMENT for table `mokejimai`
 --
 ALTER TABLE `mokejimai`
-  MODIFY `id_mokejimas` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_mokejimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `nariu_busenos`
@@ -908,7 +794,7 @@ ALTER TABLE `nariu_busenos`
 -- AUTO_INCREMENT for table `pranesimai`
 --
 ALTER TABLE `pranesimai`
-  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT for table `pranesimo_busenos`
@@ -932,13 +818,13 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT for table `skolos`
 --
 ALTER TABLE `skolos`
-  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `skolos_dalys`
 --
 ALTER TABLE `skolos_dalys`
-  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- AUTO_INCREMENT for table `skolu_statusai`
