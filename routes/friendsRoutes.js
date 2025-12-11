@@ -345,15 +345,20 @@ router.post("/api/friend-requests/:id/reject", async (req, res) => {
  * Body: { userId }
  */
 router.delete("/api/friends/:friendId", async (req, res) => {
+  const friendId = Number(req.params.friendId)
+  const userId = Number(req.body.userId)
+
+  if (!friendId || !userId) {
+    return res.status(400).json({ message: "Trūksta userId arba friendId" })
+  }
+
+  const connection = await db.getConnection()
+
   try {
-    const friendId = Number(req.params.friendId)
-    const userId = Number(req.body.userId)
+    await connection.beginTransaction()
 
-    if (!friendId || !userId) {
-      return res.status(400).json({ message: "Trūksta userId arba friendId" })
-    }
-
-    const [result] = await db.query(
+    // 1) Ištrinam draugystę
+    const [result] = await connection.query(
       `
       DELETE FROM Vartotoju_draugystes
       WHERE status = 'accepted'
@@ -367,16 +372,38 @@ router.delete("/api/friends/:friendId", async (req, res) => {
     )
 
     if (result.affectedRows === 0) {
+      await connection.rollback()
       return res.status(404).json({ message: "Draugystė nerasta" })
     }
 
-    return res.json({ message: "Draugas pašalintas" })
+    // 2) Ištrinam privačias žinutes tarp šitų dviejų vartotojų
+    // TODO: Pakeisk lentelės ir stulpelių pavadinimus į savo:
+    //   - `Zinutes` -> tavo žinučių lentelė
+    //   - `fk_siuntejas_id`, `fk_gavejas_id` -> tavo stulpeliai (pvz. sender_id, receiver_id)
+    await connection.query(
+      `
+      DELETE FROM asmeniniai_pranesimai
+      WHERE 
+        (fk_id_vartotojas_siuntejas = ? AND fk_id_vartotojas_gavejas = ?)
+        OR
+        (fk_id_vartotojas_siuntejas = ? AND fk_id_vartotojas_gavejas = ?)
+      `,
+      [userId, friendId, friendId, userId],
+    )
+
+    await connection.commit()
+
+    return res.json({ message: "Draugas pašalintas, žinutės ištrintos" })
   } catch (err) {
-    console.error("Remove friend error:", err)
+    await connection.rollback()
+    console.error("Remove friend + messages error:", err)
     return res
       .status(500)
-      .json({ message: "Serverio klaida šalinant draugą" })
+      .json({ message: "Serverio klaida šalinant draugą ir žinutes" })
+  } finally {
+    connection.release()
   }
 })
+
 
 module.exports = router
