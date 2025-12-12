@@ -1083,6 +1083,17 @@ router.put('/api/debts/:debtId', async (req, res) => {
       }
     );
 
+    //  AUTOMATINIS SKOLŲ IŠLYGINIMAS 
+    console.log(`\n[AUTO-IŠLYGINIMAS] Pradedamas skolų išlyginimas grupėje ${groupId}...`);
+    try {
+      const { autoSimplifyGroupDebts } = require('./debtSimplification');
+      const simplificationResult = await autoSimplifyGroupDebts(groupId);
+      console.log('[AUTO-IŠLYGINIMAS] Rezultatas:', simplificationResult);
+    } catch (simplifyError) {
+      // Jei išlyginimas nepavyko, tik logginam, bet netrukdome pagrindinei operacijai
+      console.error('[AUTO-IŠLYGINIMAS] Klaida:', simplifyError);
+    }
+
     res.json({ message: 'Išlaida atnaujinta', debtId, amountInEUR });
   } catch (err) {
     await connection.rollback();
@@ -1338,7 +1349,7 @@ router.post('/api/payments', async (req, res) => {
 
     res.status(201).json({
       message: 'Mokėjimas užregistruotas',
-      amountPaid: paidAmount
+      amountPaid: paidAmount  // amountPaid: amount - remainingAmount
     });
   } catch (err) {
     await connection.rollback();
