@@ -257,6 +257,21 @@ router.post('/api/debts', async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+        // NAUJAS PATIKRINIMAS - ar jau yra skola su tokiu pavadinimu
+    const [existingDebts] = await connection.query(
+      `SELECT id_skola, pavadinimas 
+       FROM Skolos 
+       WHERE fk_id_grupe = ? AND pavadinimas = ? AND (skolos_statusas = 1 OR skolos_statusas = 2)
+       LIMIT 1`,
+      [groupId, title.trim()]
+    );
+
+    if (existingDebts.length > 0) {
+      return res.status(409).json({ 
+        message: `Išlaida su pavadinimu "${title}" jau egzistuoja šioje grupėje` 
+      });
+    }
+
     await connection.beginTransaction();
 
     const today = new Date().toISOString().slice(0, 10);
@@ -764,7 +779,25 @@ router.put('/api/debts/:debtId', async (req, res) => {
       oldDescription
     } = debtRows[0];
     
-    // (jeigu norėtum tik admin / owner leidimo – čia galima tikrinti kaip delete route’e)
+    // NEW: Check for duplicate name if title is being changed
+    if (title.trim() !== oldTitle) {
+      const [duplicateCheck] = await connection.query(
+        `SELECT id_skola 
+         FROM Skolos 
+         WHERE fk_id_grupe = ? 
+         AND LOWER(TRIM(pavadinimas)) = LOWER(TRIM(?))
+         AND id_skola != ?
+         LIMIT 1`,
+        [groupId, title.trim(), debtId]
+      );
+
+      if (duplicateCheck.length > 0) {
+        await connection.rollback();
+        return res.status(400).json({ 
+          message: 'Išlaida su tokiu pavadinimu jau egzistuoja šioje grupėje' 
+        });
+      }
+    }
 
     // 2. VALIUTOS APDOROJIMAS (kaip POST metode)
     let valiutos_kodas = oldValiutosKodas || 1;
@@ -1424,5 +1457,40 @@ router.get('/api/groups/:groupId/simplify-debts', async (req, res) => {
   }
 });
 
+router.get('/api/debts/check-duplicate', async (req, res) => {
+  const { groupId, title, excludeDebtId } = req.query;
 
+  if (!groupId || !title) {
+    return res.status(400).json({ message: 'Trūksta reikalingų parametrų' });
+  }
+
+  try {
+    let query = `
+      SELECT id_skola AS debtId
+      FROM Skolos 
+      WHERE fk_id_grupe = ? 
+      AND LOWER(TRIM(pavadinimas)) = LOWER(TRIM(?))
+    `;
+    
+    const params = [groupId, title];
+
+    // Exclude current debt when editing
+    if (excludeDebtId) {
+      query += ` AND id_skola != ?`;
+      params.push(excludeDebtId);
+    }
+
+    query += ` LIMIT 1`;
+
+    const [rows] = await db.query(query, params);
+
+    res.json({
+      exists: rows.length > 0,
+      debtId: rows.length > 0 ? rows[0].debtId : null
+    });
+  } catch (err) {
+    console.error('Duplicate check error:', err);
+    res.status(500).json({ message: 'Serverio klaida' });
+  }
+});
 module.exports = router;
