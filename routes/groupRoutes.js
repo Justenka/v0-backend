@@ -123,7 +123,8 @@ router.get('/api/groups-by-user/:userId', async (req, res) => {
        FROM Grupes_nariai gn
        JOIN Grupes g ON gn.fk_id_grupe = g.id_grupe
        JOIN Vartotojai v ON g.fk_id_vartotojas = v.id_vartotojas
-       WHERE gn.fk_id_vartotojas = ?`,
+       WHERE gn.fk_id_vartotojas = ? 
+       AND gn.nario_busena = 1`,
       [userId]
     );
 
@@ -508,19 +509,34 @@ router.post("/api/groups/:groupId/join", async (req, res) => {
       return res.json({ ok: true, alreadyMember: true })
     }
 
-    // 5) įdedam narį
-    await db.query(
-      `INSERT INTO Grupes_nariai
-         (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena)
-       VALUES (?, ?, CURDATE(), 2, 1)`,
-      [groupId, actorId]
-    )
+    const [upd] = await db.query(
+  `UPDATE Kvietimai
+   SET kvietimo_busena = ?
+   WHERE id_kvietimas = ? AND kvietimo_busena = ?`,
+  [USED, invite.id_kvietimas, ACTIVE]
+)
 
-    // 6) pažymim kvietimą panaudotu
-    await db.query(
-      `UPDATE Kvietimai SET kvietimo_busena = ? WHERE id_kvietimas = ?`,
-      [USED, invite.id_kvietimas]
-    )
+if (upd.affectedRows === 0) {
+  return res.status(400).json({ message: "Kvietimas nebegalioja" })
+}
+
+
+    // 5) įdedam narį
+const [ins] = await db.query(
+  `INSERT IGNORE INTO Grupes_nariai
+     (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena)
+   VALUES (?, ?, CURDATE(), 2, 1)`,
+  [groupId, actorId]
+)
+
+if (ins.affectedRows === 0) {
+      // 6) pažymim kvietimą panaudotu
+  await db.query(
+    `UPDATE Kvietimai SET kvietimo_busena = ? WHERE id_kvietimas = ?`,
+    [USED, invite.id_kvietimas]
+  )
+  return res.json({ ok: true, alreadyMember: true })
+}
 
     // (optional) istorija
     await addGroupHistoryEntry(
@@ -674,6 +690,214 @@ router.delete("/api/groups/:groupId", async (req, res) => {
     conn.release()
   }
 })
+
+// POST /api/groups/:groupId/invite-friend
+router.post("/api/groups/:groupId/invite-friend", async (req, res) => {
+  const { groupId } = req.params
+  const actorId = Number(req.header("x-user-id"))
+  const toUserId = Number(req.body?.toUserId)
+
+  if (!actorId) return res.status(401).json({ message: "Trūksta x-user-id" })
+  if (!toUserId) return res.status(400).json({ message: "Trūksta toUserId" })
+  if (actorId === toUserId) return res.status(400).json({ message: "Negalite pakviesti savęs" })
+
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    // 1) actor must be admin in this group
+    const [actorMemberRows] = await conn.query(
+      `SELECT id_grupes_narys, role
+       FROM grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+       LIMIT 1`,
+      [groupId, actorId],
+    )
+
+    if (actorMemberRows.length === 0 || Number(actorMemberRows[0].role) !== 3) {
+      await conn.rollback()
+      return res.status(403).json({ message: "Tik adminas gali kviesti į grupę" })
+    }
+
+    // 2) must be friends (accepted)
+    const [friendRows] = await conn.query(
+      `SELECT id_draugyste
+       FROM Vartotoju_draugystes
+       WHERE status = 'accepted'
+         AND (
+           (fk_requester_id = ? AND fk_addressee_id = ?)
+           OR
+           (fk_requester_id = ? AND fk_addressee_id = ?)
+         )
+       LIMIT 1`,
+      [actorId, toUserId, toUserId, actorId],
+    )
+
+    if (friendRows.length === 0) {
+      await conn.rollback()
+      return res.status(403).json({ message: "Galite kviesti tik draugus" })
+    }
+
+    // 3) don't invite if already in group
+    const [alreadyMember] = await conn.query(
+      `SELECT id_grupes_narys
+       FROM grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+       LIMIT 1`,
+      [groupId, toUserId],
+    )
+
+    if (alreadyMember.length > 0) {
+      await conn.rollback()
+      return res.status(409).json({ message: "Vartotojas jau yra grupėje" })
+    }
+
+    // 4) create invite token (same as your /invites route)
+    const token = generateToken10()
+    const ACTIVE = 1
+
+    const [insertInvite] = await conn.query(
+      `INSERT INTO Kvietimai (tokenas, sukurimo_data, galiojimo_trukme, kvietimo_busena)
+       VALUES (?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), ?)`,
+      [token, ACTIVE],
+    )
+
+    const inviteId = insertInvite.insertId
+    const actorGroupMemberId = actorMemberRows[0].id_grupes_narys
+
+    await conn.query(
+      `INSERT INTO Sukuria (fk_id_kvietimas, fk_id_grupes_narys)
+       VALUES (?, ?)`,
+      [inviteId, actorGroupMemberId],
+    )
+
+    // 5) create notification for the invited user
+    const [groupRows] = await conn.query(
+      `SELECT pavadinimas FROM grupes WHERE id_grupe = ? LIMIT 1`,
+      [groupId],
+    )
+    const groupName = groupRows.length ? groupRows[0].pavadinimas : "grupę"
+
+    const [actorRows] = await conn.query(
+      `SELECT vardas, pavarde FROM vartotojai WHERE id_vartotojas = ? LIMIT 1`,
+      [actorId],
+    )
+    const actorName = actorRows.length
+      ? `${actorRows[0].vardas} ${actorRows[0].pavarde || ""}`.trim()
+      : "Vartotojas"
+
+    const actionUrl = `/groups/${groupId}/join?token=${encodeURIComponent(token)}`
+    const metadata = JSON.stringify({
+      type: "group_invite",
+      groupId: Number(groupId),
+      inviteId,
+      token,
+      inviterId: actorId,
+    })
+
+    await conn.query(
+      `INSERT INTO pranesimai
+        (fk_id_vartotojas, tipas, pavadinimas, tekstas, action_url, metadata)
+       VALUES (?, 'group_invite', ?, ?, ?, ?)`,
+      [
+        toUserId,
+        "Kvietimas į grupę",
+        `${actorName} pakvietė jus prisijungti prie grupės „${groupName}“`,
+        actionUrl,
+        metadata,
+      ],
+    )
+
+    await conn.commit()
+
+    return res.status(201).json({
+      ok: true,
+      token,
+      inviteId,
+      actionUrl,
+    })
+  } catch (err) {
+    await conn.rollback()
+    console.error("Invite friend to group error:", err)
+    return res.status(500).json({ message: "Serverio klaida kviečiant į grupę" })
+  } finally {
+    conn.release()
+  }
+})
+
+// POST /api/groups/invites/:inviteId/accept
+router.post("/api/groups/invites/:inviteId/accept", async (req, res) => {
+  const inviteId = Number(req.params.inviteId)
+  const userId = Number(req.header("x-user-id"))
+
+  if (!userId) return res.status(401).json({ message: "Unauthorized" })
+
+  const conn = await db.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    // 1) validate invite
+    const [inviteRows] = await conn.query(
+      `SELECT k.id_kvietimas, k.kvietimo_busena, s.fk_id_grupes_narys
+       FROM Kvietimai k
+       JOIN Sukuria s ON s.fk_id_kvietimas = k.id_kvietimas
+       WHERE k.id_kvietimas = ?`,
+      [inviteId]
+    )
+
+    if (!inviteRows.length || inviteRows[0].kvietimo_busena !== 1) {
+      await conn.rollback()
+      return res.status(400).json({ message: "Kvietimas negalioja" })
+    }
+
+    // 2) get group
+    const [groupRows] = await conn.query(
+      `SELECT fk_id_grupe
+       FROM grupes_nariai
+       WHERE id_grupes_narys = ?`,
+      [inviteRows[0].fk_id_grupes_narys]
+    )
+
+    const groupId = groupRows[0].fk_id_grupe
+
+    // 3) add user to group
+    await conn.query(
+      `INSERT INTO grupes_nariai (fk_id_grupe, fk_id_vartotojas, role, nario_busena)
+       VALUES (?, ?, 1, 1)`,
+      [groupId, userId]
+    )
+
+    // 4) mark invite accepted
+    await conn.query(
+      `UPDATE Kvietimai SET kvietimo_busena = 2 WHERE id_kvietimas = ?`,
+      [inviteId]
+    )
+
+    await conn.commit()
+    res.json({ ok: true })
+  } catch (e) {
+    await conn.rollback()
+    res.status(500).json({ message: "Serverio klaida" })
+  } finally {
+    conn.release()
+  }
+})
+
+// POST /api/groups/invites/:inviteId/decline
+router.post("/api/groups/invites/:inviteId/decline", async (req, res) => {
+  const inviteId = Number(req.params.inviteId)
+  const userId = Number(req.header("x-user-id"))
+
+  if (!userId) return res.status(401).json({ message: "Unauthorized" })
+
+  await db.query(
+    `UPDATE Kvietimai SET kvietimo_busena = 3 WHERE id_kvietimas = ?`,
+    [inviteId]
+  )
+
+  res.json({ ok: true })
+})
+
 
 
 // ==================================================================
