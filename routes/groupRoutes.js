@@ -1,6 +1,7 @@
 // routes/groupRoutes.js
 const express = require('express');
 const db = require('../db');
+const crypto = require("crypto")
 const { addGroupHistoryEntry } = require('../lib/groupHistory');
 // jei turi auth middleware, vėliau:
 // const auth = require('../middleware/authMiddleware');
@@ -321,6 +322,223 @@ router.post("/api/groups/:groupId/members", async (req, res) => {
   }
 });
 
+// ------------------------------
+// INVITES
+// ------------------------------
+
+function generateToken10() {
+  // 10 chars base62-ish (0-9a-zA-Z)
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  const bytes = crypto.randomBytes(10)
+  let out = ""
+  for (let i = 0; i < 10; i++) out += chars[bytes[i] % chars.length]
+  return out
+}
+
+// POST /api/groups/:groupId/invites – sukurti kvietimą (sugeneruoja tokeną serveryje)
+router.post("/api/groups/:groupId/invites", async (req, res) => {
+  const { groupId } = req.params
+  const actorId = Number(req.header("x-user-id")) || null
+  
+  try {
+
+    // 1) ar kviečiantis vartotojas yra grupėje (reikia id_grupes_narys)
+// Jei nėra - bet jis yra grupės savininkas (grupes.fk_id_vartotojas) - sukurti jam įrašą grupes_nariai.
+let creatorGroupMemberId = null
+
+const [memberRows] = await db.query(
+  `SELECT id_grupes_narys, role, nario_busena
+   FROM grupes_nariai
+   WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+   LIMIT 1`,
+  [groupId, actorId]
+)
+
+if (memberRows.length > 0) {
+  creatorGroupMemberId = memberRows[0].id_grupes_narys
+} else {
+  // nėra nario įrašo - tikrinam ar jis grupės savininkas
+  const [ownerRows] = await db.query(
+    `SELECT fk_id_vartotojas
+     FROM grupes
+     WHERE id_grupe = ?
+     LIMIT 1`,
+    [groupId]
+  )
+
+  if (ownerRows.length === 0) {
+    return res.status(404).json({ message: "Grupė nerasta" })
+  }
+
+  const ownerId = Number(ownerRows[0].fk_id_vartotojas)
+  if (ownerId !== actorId) {
+    return res.status(403).json({ message: "Neturite teisės kurti kvietimo šiai grupei" })
+  }
+
+  // savininkas, bet nėra grupes_nariai įrašo – sukuriam
+  // role: 3 = 'grupes sukurejas', nario_busena: 1 = 'aktyvus'
+  const [ins] = await db.query(
+    `INSERT INTO grupes_nariai
+       (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena)
+     VALUES (?, ?, CURDATE(), 3, 1)`,
+    [groupId, actorId]
+  )
+
+  creatorGroupMemberId = ins.insertId
+}
+
+if (!creatorGroupMemberId) {
+  return res.status(403).json({ message: "Neturite teisės kurti kvietimo šiai grupei" })
+}
+
+    // 2) kuriam tokeną ir įrašom į kvietimai
+    // galiojimas: 7 dienos
+    const token = generateToken10()
+
+    // statusai iš kvietimo_busenos: 1 aktyvus, 2 pasibaiges, 3 panaudotas
+    const ACTIVE = 1
+
+    const [insertInvite] = await db.query(
+      `INSERT INTO Kvietimai (tokenas, sukurimo_data, galiojimo_trukme, kvietimo_busena)
+       VALUES (?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), ?)`,
+      [token, ACTIVE]
+    )
+
+    const inviteId = insertInvite.insertId
+
+    // 3) sujungiam per sukuria (kvietimas -> grupes_narys, iš jo gaunasi grupė)
+    await db.query(
+      `INSERT INTO Sukuria (fk_id_kvietimas, fk_id_grupes_narys)
+       VALUES (?, ?)`,
+      [inviteId, creatorGroupMemberId]
+    )
+
+    // (optional) istorija
+    await addGroupHistoryEntry(
+      Number(groupId),
+      actorId,
+      "invite_created",
+      `Sugeneruota kvietimo nuoroda.`,
+      { inviteId }
+    )
+
+    return res.json({
+      token,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+  } catch (err) {
+    console.error("Create invite error:", err)
+    return res.status(500).json({ message: "Nepavyko sukurti kvietimo" })
+  }
+})
+
+// POST /api/groups/:groupId/join – prisijungti į grupę su tokenu
+router.post("/api/groups/:groupId/join", async (req, res) => {
+  const { groupId } = req.params
+  const { token } = req.body || {}
+  const actorId = Number(req.header("x-user-id")) || null
+
+  if (!actorId) return res.status(401).json({ message: "Trūksta x-user-id" })
+  if (!token) return res.status(400).json({ message: "Trūksta token" })
+
+  try {
+    // 1) randam kvietimą ir jo grupę per sukuria -> grupes_nariai
+    const [rows] = await db.query(
+      `SELECT 
+         k.id_kvietimas,
+         k.tokenas,
+         k.galiojimo_trukme,
+         k.kvietimo_busena,
+         gn.fk_id_grupe AS invite_group_id
+       FROM Kvietimai k
+       JOIN Sukuria s ON s.fk_id_kvietimas = k.id_kvietimas
+       JOIN Grupes_nariai gn ON gn.id_grupes_narys = s.fk_id_grupes_narys
+       WHERE k.tokenas = ?
+       LIMIT 1`,
+      [token]
+    )
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: "Neteisingas kvietimo tokenas" })
+    }
+
+    const invite = rows[0]
+
+    if (Number(invite.invite_group_id) !== Number(groupId)) {
+      return res.status(400).json({ message: "Šis kvietimas nepriklauso šiai grupei" })
+    }
+
+    const ACTIVE = 1
+    const EXPIRED = 2
+    const USED = 3
+
+    // 2) patikrinam statusą
+    if (invite.kvietimo_busena !== ACTIVE) {
+      return res.status(400).json({ message: "Kvietimas nebegalioja" })
+    }
+
+    // 3) patikrinam galiojimą
+    const [expCheck] = await db.query(
+      `SELECT (galiojimo_trukme < CURDATE()) AS is_expired
+       FROM Kvietimai
+       WHERE id_kvietimas = ?
+       LIMIT 1`,
+      [invite.id_kvietimas]
+    )
+
+    if (expCheck[0]?.is_expired) {
+      // pažymim kaip pasibaigęs
+      await db.query(
+        `UPDATE Kvietimai SET kvietimo_busena = ? WHERE id_kvietimas = ?`,
+        [EXPIRED, invite.id_kvietimas]
+      )
+      return res.status(400).json({ message: "Kvietimo galiojimas pasibaigęs" })
+    }
+
+    // 4) jei jau yra grupėje – grąžinam ok (idempotentiška)
+    const [existing] = await db.query(
+      `SELECT id_grupes_narys
+       FROM Grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+       LIMIT 1`,
+      [groupId, actorId]
+    )
+
+    if (existing.length > 0) {
+      return res.json({ ok: true, alreadyMember: true })
+    }
+
+    // 5) įdedam narį
+    await db.query(
+      `INSERT INTO Grupes_nariai
+         (fk_id_grupe, fk_id_vartotojas, prisijungimo_data, role, nario_busena)
+       VALUES (?, ?, CURDATE(), 2, 1)`,
+      [groupId, actorId]
+    )
+
+    // 6) pažymim kvietimą panaudotu
+    await db.query(
+      `UPDATE Kvietimai SET kvietimo_busena = ? WHERE id_kvietimas = ?`,
+      [USED, invite.id_kvietimas]
+    )
+
+    // (optional) istorija
+    await addGroupHistoryEntry(
+      Number(groupId),
+      actorId,
+      "invite_accepted",
+      `Prisijungta prie grupės per kvietimą.`,
+      { inviteId: invite.id_kvietimas }
+    )
+
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error("Join by invite error:", err)
+    return res.status(500).json({ message: "Nepavyko prisijungti prie grupės" })
+  }
+})
+
+
 
 router.get('/api/debt-parts/:debtId', async (req, res) => {
   const { debtId } = req.params;
@@ -396,32 +614,66 @@ router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
   }
 })
 
-// DELETE /api/groups/:id – ištrinti grupę ir susijusius duomenis
-router.delete("/api/groups/:id", async (req, res) => {
-  const { id } = req.params;
+// DELETE /api/groups/:groupId – ištrinti grupę ir susijusius duomenis
+router.delete("/api/groups/:groupId", async (req, res) => {
+  const groupId = Number(req.params.groupId)
+  if (!Number.isInteger(groupId) || groupId <= 0) {
+    return res.status(400).json({ message: "Blogas groupId" })
+  }
 
+  const conn = await db.getConnection()
   try {
-    // Ištrinam priklausomus įrašus (pagal FK struktūrą)
-    await db.query("DELETE FROM Grupes_zinutes WHERE fk_id_grupe = ?", [id]);
-    await db.query("DELETE FROM Skolos WHERE fk_id_grupe = ?", [id]);
-    await db.query("DELETE FROM Grupes_nariai WHERE fk_id_grupe = ?", [id]);
+    await conn.beginTransaction()
 
-    const [result] = await db.query(
-      "DELETE FROM Grupes WHERE id_grupe = ?",
-      [id]
-    );
+    const [memberRows] = await conn.query(
+      `SELECT id_grupes_narys FROM grupes_nariai WHERE fk_id_grupe = ?`,
+      [groupId]
+    )
+    const memberIds = memberRows.map(r => r.id_grupes_narys)
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Grupė nerasta" });
+    let inviteIds = []
+    if (memberIds.length > 0) {
+      const [inviteRows] = await conn.query(
+        `SELECT DISTINCT fk_id_kvietimas AS id
+         FROM sukuria
+         WHERE fk_id_grupes_narys IN (?)`,
+        [memberIds]
+      )
+      inviteIds = inviteRows.map(r => r.id)
+
+      await conn.query(
+        `DELETE FROM sukuria WHERE fk_id_grupes_narys IN (?)`,
+        [memberIds]
+      )
     }
 
-    res.json({ success: true });
+    if (inviteIds.length > 0) {
+      await conn.query(
+        `DELETE FROM kvietimai WHERE id_kvietimas IN (?)`,
+        [inviteIds]
+      )
+    }
+
+    await conn.query(`DELETE FROM grupes_zinutes WHERE fk_id_grupe = ?`, [groupId])
+    await conn.query(`DELETE FROM skolos WHERE fk_id_grupe = ?`, [groupId])
+    await conn.query(`DELETE FROM grupes_nariai WHERE fk_id_grupe = ?`, [groupId])
+
+    const [del] = await conn.query(`DELETE FROM grupes WHERE id_grupe = ?`, [groupId])
+    if (del.affectedRows === 0) {
+      await conn.rollback()
+      return res.status(404).json({ message: "Grupė nerasta" })
+    }
+
+    await conn.commit()
+    return res.json({ ok: true })
   } catch (err) {
-    console.error("Delete group error:", err);
-    const message = err.sqlMessage || err.message || "Serverio klaida";
-    res.status(500).json({ message });
+    await conn.rollback()
+    console.error("Delete group error:", err)
+    return res.status(500).json({ message: "Nepavyko ištrinti grupės" })
+  } finally {
+    conn.release()
   }
-});
+})
 
 
 // ==================================================================
