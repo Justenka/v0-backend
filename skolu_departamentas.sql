@@ -389,7 +389,7 @@ CREATE TABLE `skolos_dalys` (
   `fk_id_vartotojas` int(11) NOT NULL,
   `suma` decimal(10,2) NOT NULL,
   `procentas` decimal(5,2) NOT NULL,
-  `apmoketa` BOOLEAN NOT NULL,
+  `apmoketa` BOOLEAN NOT NULL DEFAULT FALSE,
   `sumoketa` decimal(10,2) NOT NULL DEFAULT 0.00,
   `delspinigiai` tinyint(1) NOT NULL,
   `vaidmuo` int(11) NOT NULL
@@ -488,7 +488,9 @@ CREATE TABLE `valiutos` (
 INSERT INTO `valiutos` (`id_valiuta`, `name`, `santykis`) VALUES
 (1, 'EUR', 1),
 (2, 'USD', 1.1714),
-(3, 'PLN', 4.227);
+(3, 'PLN', 4.227),
+(4, 'GBP', 0.8751),
+(5, 'JPY', 182.25);
 
 -- --------------------------------------------------------
 

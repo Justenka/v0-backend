@@ -18,6 +18,7 @@ const currencyRoutes = require("./routes/CurrencyRoutes");
 const { startCurrencyUpdater } = require("./routes/currencyUpdater");
 const settingsRoutes = require("./routes/settingsRoutes");
 const notificationsRoutes = require("./routes/notificationsRoutes");
+const { scheduleLateFeeUpdates, updateLateFees } = require('./routes/updateLateFees');
 
 // Middleware
 const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL
@@ -33,6 +34,9 @@ app.use(cors(corsOptions))
 app.use(express.json())
 
 startCurrencyUpdater()
+
+// Initialize the late fee cron job
+scheduleLateFeeUpdates();
 
 // Health check (gali palikti čia, nes paprasta)
 app.get('/api/health', (req, res) => {

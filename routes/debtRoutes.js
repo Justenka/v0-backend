@@ -244,12 +244,38 @@ router.post('/api/debts', async (req, res) => {
     paidByUserId,
     categoryId,
     splits = [],
-    lateFeeAmount,
-    lateFeeAfterDays = 30
+    lateFeePercentage,
+    lateFeeAfterDays = 7
   } = req.body;
 
   if (!groupId || !title || !amount || !paidByUserId || splits.length === 0) {
     return res.status(400).json({ message: 'Trūksta privalomų laukų' });
+  }
+  
+  // ✅ FIX: Properly parse and validate lateFeePercentage
+  let validLateFeePercentage = null;
+  
+  console.log(`ATEJOOOO ${lateFeePercentage}`);
+
+  if (lateFeePercentage !== undefined && lateFeePercentage !== null && lateFeePercentage !== '') {
+    const parsed = parseFloat(lateFeePercentage);
+
+    if (!isNaN(parsed) && parsed > 0) {
+      validLateFeePercentage = parsed;
+      console.log(`✅ Valid late fee percentage: ${validLateFeePercentage}%`);
+    } else {
+      console.log(`❌ Invalid late fee percentage: ${lateFeePercentage} (parsed as ${parsed})`);
+    }
+  }
+
+  // Add validation for late fee days
+  if (validLateFeePercentage !== null) {
+    const days = parseInt(lateFeeAfterDays);
+    if (days < 1) {
+      return res.status(400).json({
+        message: 'Delspinigių laukimo laikas turi būti bent 1 diena'
+      });
+    }
   }
 
   const actorRaw = req.header("x-user-id");
@@ -257,7 +283,7 @@ router.post('/api/debts', async (req, res) => {
 
   const connection = await db.getConnection();
   try {
-        // NAUJAS PATIKRINIMAS - ar jau yra skola su tokiu pavadinimu
+    // NAUJAS PATIKRINIMAS - ar jau yra skola su tokiu pavadinimu
     const [existingDebts] = await connection.query(
       `SELECT id_skola, pavadinimas 
        FROM Skolos 
@@ -267,8 +293,8 @@ router.post('/api/debts', async (req, res) => {
     );
 
     if (existingDebts.length > 0) {
-      return res.status(409).json({ 
-        message: `Išlaida su pavadinimu "${title}" jau egzistuoja šioje grupėje` 
+      return res.status(409).json({
+        message: `Išlaida su pavadinimu "${title}" jau egzistuoja šioje grupėje`
       });
     }
 
@@ -298,7 +324,7 @@ router.post('/api/debts', async (req, res) => {
           if (rows.length > 0) {
             valiutos_kodas = rows[0].id_valiuta;
           } else {
-            console.log(`Valiuta nerasta: ${code}, naudojamas default EUR (1)`);
+            console.log(`Valiuta nerasta: ${code}, naudojamas default EUR (1)`);    // TODO: ar reik
             valiutos_kodas = 1;
           }
         } catch (e) {
@@ -314,7 +340,7 @@ router.post('/api/debts', async (req, res) => {
         `SELECT santykis FROM valiutos WHERE id_valiuta = ? LIMIT 1`,
         [valiutos_kodas]
       );
-      
+
       if (valiutaRows.length > 0) {
         valiutosSantykis = parseFloat(valiutaRows[0].santykis);
         console.log(`Valiutos ${valiutos_kodas} santykis: ${valiutosSantykis}`);
@@ -326,8 +352,8 @@ router.post('/api/debts', async (req, res) => {
 
     // --- KONVERTUOJAME SUMĄ Į EURUS ---
     const originalAmount = parseFloat(amount);
-    const amountInEUR = originalAmount;
-    
+    const amountInEUR = originalAmount;             //ar ne tinka toks? const amountInEUR = originalAmount / valiutosSantykis;
+
     console.log(`Originali suma: ${originalAmount} (valiuta: ${valiutos_kodas})`);
     console.log(`Suma eurais: ${amountInEUR}`);
     console.log(`Santykis naudotas: ${valiutosSantykis}`);
@@ -348,6 +374,30 @@ router.post('/api/debts', async (req, res) => {
         }
       }
     }
+
+    // Parse description - could be string or JSON
+    let finalDescription = null;
+    let metadata = {};
+
+    // Try to parse description if it's JSON
+    if (description) {
+      try {
+        metadata = JSON.parse(description);
+      } catch {
+        // If not JSON, treat as plain text
+        metadata = { userDescription: description };
+      }
+    }
+
+    // Add late fee metadata if valid
+    if (validLateFeePercentage !== null) {
+      metadata.lateFeeEnabled = true;
+      metadata.lateFeePercentage = validLateFeePercentage;
+      metadata.lateFeeAfterDays = parseInt(lateFeeAfterDays);
+      console.log('📊 Adding late fee metadata:', metadata);
+    }
+
+    finalDescription = JSON.stringify(metadata);
 
     // 1. Sukuriame skolą - įrašome sumą EURAIS, bet išsaugome originalią valiutą
     const [debtResult] = await connection.query(
@@ -376,9 +426,10 @@ router.post('/api/debts', async (req, res) => {
     // 2. Sukuriame skolos dalis - SVARBU: dalis taip pat konvertuojame į eurus
     for (const split of splits) {
       const role = Number(split.userId) === Number(paidByUserId) ? 2 : 1;
+      const fee = role === 1; // delspinigiai galioja tik skolininkams
 
       // *** NAUJAS LOGIKA: Apskaičiuojame sumą pagal procentus ***
-      
+
       let splitAmount = split.amount || 0;
       let splitPercentage = split.percentage || 0;
 
@@ -397,10 +448,15 @@ router.post('/api/debts', async (req, res) => {
       const apmoketa = role === 2 ? 1 : 0;
       const sumoketa = role === 2 ? splitAmount : 0;
 
-      
+
       // KONVERTUOJAME SPLIT SUMĄ Į EURUS
       const splitAmountInEUR = splitAmount / valiutosSantykis;
-      
+      const sumoketaInEUR = sumoketa / valiutosSantykis;
+
+      // Set delspinigiai flag if late fees enabled and user is debtor
+      const hasLateFee = (parseFloat(lateFeePercentage) > 0 && role === 1) ? 1 : 0;
+      // const hasLateFee = lateFeePercentage && parseFloat(lateFeePercentage) > 0 && role === 1 ? 1 : 0; double check
+
       await connection.query(
         `INSERT INTO Skolos_dalys 
           (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, sumoketa, delspinigiai, vaidmuo)
@@ -411,28 +467,83 @@ router.post('/api/debts', async (req, res) => {
           splitAmountInEUR, // KONVERTUOTA SUMA EURAIS
           splitPercentage,
           apmoketa,
-          sumoketa / valiutosSantykis, // KONVERTUOTA SUMA EURAIS
-          lateFeeAmount > 0 ? 1 : 0,  // delspinigiai
+          sumoketaInEUR, // KONVERTUOTA SUMA EURAIS
+          fee,  // delspinigiai - THIS SHOULD BE 1 or 0
           role  // vaidmuo - THIS SHOULD BE 1 or 2, NOT 0
         ]
       );
+
     }
+
+    // 3. AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+    const lateFeeStartDate = new Date(termDateStr);
+    lateFeeStartDate.setDate(lateFeeStartDate.getDate() + parseInt(lateFeeAfterDays));
+    const lateFeeStartDateStr = lateFeeStartDate.toISOString().slice(0, 10);
+
+    const [debtParts] = await connection.query(
+      `SELECT id_skolos_dalis 
+      FROM Skolos_dalys 
+      WHERE fk_id_skola = ? AND vaidmuo = 1 AND apmoketa = 0 AND delspinigiai = 1`,
+      [debtId]
+    );
+
+    for (const part of debtParts) {
+
+      const [countSMT] = await connection.query(
+        `SELECT COUNT(apskaiciuota_suma) as cnt
+      FROM delspinigiai 
+      WHERE fk_id_skolos_dalis = ?`,
+        [part.id_skolos_dalis]
+      );
+
+      console.log(`PASIEKE ${countSMT[0].cnt}`);
+      console.log(`PASIEKE ${parseFloat(lateFeePercentage)}`);
+      console.log(`PASIEKE ${lateFeePercentage}`);
+      console.log(`PASIEKE ${metadata.late_fee_percentage}`);
+      console.log(metadata);
+
+      if (countSMT[0].cnt == 0) {
+        //const lateFeeStartDate = new Date(today);
+
+
+        await connection.query(
+          `INSERT INTO delspinigiai 
+          (fk_id_skolos_dalis, dienos_proc, pradzios_data, apskaiciuota_suma, aktyvus)
+          VALUES (?, ?, ?, 0.00, 1)`,
+          [
+            part.id_skolos_dalis,
+            lateFeePercentage,
+            lateFeeStartDateStr // When to START calculating (term + lateFeeAfterDays)
+          ]
+        );
+      
+        console.log(`[DELSPINIGIAI] Created active late fee entry for debt part ${part.id_skolos_dalis}`);
+        console.log(`[DELSPINIGIAI] Rate: ${lateFeePercentage}% per day, starts: ${lateFeeStartDateStr}`);
+      }
+
+
+    }
+
 
     await connection.commit();
 
     const historyUserId = actorId ?? Number(paidByUserId);
+    const lateFeeText = lateFeePercentage ? ` su delspinigiais ${lateFeePercentage}% per dieną` : '';
 
     await addGroupHistoryEntry(
       Number(groupId),
       historyUserId,
       "expense_added",
-      `Išlaida "${title}" pridėta (${originalAmount} ${currencyCode}).`,
+      `Išlaida "${title}" pridėta (${originalAmount} ${currencyCode})${lateFeeText}.`,
       {
         debtId,
         amount: originalAmount,
         currencyCode,
         paidByUserId: Number(paidByUserId),
         createdByUserId: historyUserId,
+        lateFeePercentage: lateFeePercentage ? parseFloat(lateFeePercentage) : null,
+        lateFeeAfterDays: lateFeePercentage ? parseInt(lateFeeAfterDays) : null
       }
     );
 
@@ -447,6 +558,7 @@ router.post('/api/debts', async (req, res) => {
         WHERE id_grupe = ?`,
         [groupIdNum]
       );
+
       const groupName = groupRows[0]?.pavadinimas ?? "grupė";
 
       // 2) Pasiimam, kas sukūrė išlaidą (vardas + pavardė)
@@ -516,12 +628,13 @@ router.post('/api/debts', async (req, res) => {
       console.error('[AUTO-IŠLYGINIMAS] Klaida:', simplifyError);
     }
 
-    res.status(201).json({ 
-      message: 'Išlaida sėkmingai pridėta!', 
+    res.status(201).json({
+      message: 'Išlaida sėkmingai pridėta!',
       debtId,
       originalAmount,
       amountInEUR,
-      conversionRate: valiutosSantykis
+      conversionRate: valiutosSantykis,
+      lateFeePercentage: lateFeePercentage ? parseFloat(lateFeePercentage) : null
     });
   } catch (err) {
     await connection.rollback();
@@ -626,8 +739,8 @@ router.delete('/api/debts/:debtId', async (req, res) => {
 
     const currencyCode =
       valiutos_kodas === 1 ? 'EUR' :
-      valiutos_kodas === 2 ? 'USD' :
-      valiutos_kodas === 3 ? 'PLN' : 'UNK';
+        valiutos_kodas === 2 ? 'USD' :
+          valiutos_kodas === 3 ? 'PLN' : 'UNK';
 
     await addGroupHistoryEntry(
       Number(groupId),
@@ -750,7 +863,7 @@ router.put('/api/debts/:debtId', async (req, res) => {
     await connection.beginTransaction();
 
     // 1. Pasiimam DABARTINĘ skolos info prieš keitimą (istorijai)
-        const [debtRows] = await connection.query(
+    const [debtRows] = await connection.query(
       `SELECT 
          fk_id_vartotojas AS oldPaidById,
          fk_id_grupe      AS groupId,
@@ -778,7 +891,7 @@ router.put('/api/debts/:debtId', async (req, res) => {
       oldKategorijaId,
       oldDescription
     } = debtRows[0];
-    
+
     // NEW: Check for duplicate name if title is being changed
     if (title.trim() !== oldTitle) {
       const [duplicateCheck] = await connection.query(
@@ -793,8 +906,8 @@ router.put('/api/debts/:debtId', async (req, res) => {
 
       if (duplicateCheck.length > 0) {
         await connection.rollback();
-        return res.status(400).json({ 
-          message: 'Išlaida su tokiu pavadinimu jau egzistuoja šioje grupėje' 
+        return res.status(400).json({
+          message: 'Išlaida su tokiu pavadinimu jau egzistuoja šioje grupėje'
         });
       }
     }
@@ -872,26 +985,26 @@ router.put('/api/debts/:debtId', async (req, res) => {
 
     const updateParams = paidById
       ? [
-          title,
-          description || null,
-          amountInEUR,
-          valiutosSantykis,
-          valiutos_kodas,
-          kategorijaId,
-          newPaidById,
-          today,
-          debtId
-        ]
+        title,
+        description || null,
+        amountInEUR,
+        valiutosSantykis,
+        valiutos_kodas,
+        kategorijaId,
+        newPaidById,
+        today,
+        debtId
+      ]
       : [
-          title,
-          description || null,
-          amountInEUR,
-          valiutosSantykis,
-          valiutos_kodas,
-          kategorijaId,
-          today,
-          debtId
-        ];
+        title,
+        description || null,
+        amountInEUR,
+        valiutosSantykis,
+        valiutos_kodas,
+        kategorijaId,
+        today,
+        debtId
+      ];
 
     await connection.query(updateQuery, updateParams);
 
@@ -930,7 +1043,7 @@ router.put('/api/debts/:debtId', async (req, res) => {
         await connection.query(
           `INSERT INTO Skolos_dalys 
             (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, sumoketa, delspinigiai, vaidmuo)
-           VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             debtId,
             split.userId,
@@ -938,6 +1051,7 @@ router.put('/api/debts/:debtId', async (req, res) => {
             splitPercentage,
             apmoketa,
             sumoketa,
+            0,
             role
           ]
         );
@@ -954,19 +1068,19 @@ router.put('/api/debts/:debtId', async (req, res) => {
       oldValiutosKodas === 1
         ? "EUR"
         : oldValiutosKodas === 2
-        ? "USD"
-        : oldValiutosKodas === 3
-        ? "PLN"
-        : "UNK";
+          ? "USD"
+          : oldValiutosKodas === 3
+            ? "PLN"
+            : "UNK";
 
     const newCurrencyCode =
       valiutos_kodas === 1
         ? "EUR"
         : valiutos_kodas === 2
-        ? "USD"
-        : valiutos_kodas === 3
-        ? "PLN"
-        : "UNK";
+          ? "USD"
+          : valiutos_kodas === 3
+            ? "PLN"
+            : "UNK";
 
     const safeOldAmount = Number(oldAmount);
     const safeNewAmount = Number(amountInEUR);
@@ -1095,13 +1209,12 @@ router.put('/api/debts/:debtId', async (req, res) => {
 
     const descriptionText = changes.length
       ? `Išlaida "${displayOldTitle}" atnaujinta (${changes
-          .map(
-            (c) =>
-              `${c.label}: ${c.oldValue ?? "nenurodyta"} → ${
-                c.newValue ?? "nenurodyta"
-              }`
-          )
-          .join(", ")}).`
+        .map(
+          (c) =>
+            `${c.label}: ${c.oldValue ?? "nenurodyta"} → ${c.newValue ?? "nenurodyta"
+            }`
+        )
+        .join(", ")}).`
       : `Išlaida "${displayOldTitle}" atnaujinta.`;
 
     await addGroupHistoryEntry(
@@ -1471,7 +1584,7 @@ router.get('/api/debts/check-duplicate', async (req, res) => {
       WHERE fk_id_grupe = ? 
       AND LOWER(TRIM(pavadinimas)) = LOWER(TRIM(?))
     `;
-    
+
     const params = [groupId, title];
 
     // Exclude current debt when editing
