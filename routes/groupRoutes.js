@@ -138,6 +138,9 @@ router.get('/api/groups-by-user/:userId', async (req, res) => {
 // GET /api/groups/:id – pilna grupė su nariais
 router.get('/api/groups/:id', async (req, res) => {
   const { id } = req.params
+  
+  // Galima pridėti papildomą "public" parametrą URL
+  const isPublicView = req.query.public === 'true'
 
   try {
     // 1. Pati grupė
@@ -171,21 +174,15 @@ router.get('/api/groups/:id', async (req, res) => {
 
     const mapRole = (roleInt) => {
       switch (roleInt) {
-        case 3:
-          return "admin"   // grupės kūrėjas
-        case 2:
-          return "member"  // grupės narys
+        case 3: return "admin"
+        case 2: return "member"
         case 1:
-        default:
-          return "guest"   // svečias
+        default: return "guest"
       }
     }
 
     const members = memberRows.map(m => {
-      const email =
-        m.email ||
-        `${m.name.toLowerCase().replace(/\s+/g, '.')}@example.com`
-
+      const email = m.email || `${m.name.toLowerCase().replace(/\s+/g, '.')}@example.com`
       return {
         id: m.id,
         name: m.name,
@@ -194,9 +191,66 @@ router.get('/api/groups/:id', async (req, res) => {
       }
     })
 
+    // 3. NAUJAS: Gauti visas skolos (išlaidas) šiai grupei
+    const [debtRows] = await db.query(
+      `SELECT 
+         s.id_skola AS id,
+         s.pavadinimas AS title,
+         s.aprasymas AS description,
+         s.suma AS amount,
+         s.sukurimo_data AS date,
+         s.valiutos_kodas,
+         s.kategorija AS categoryId,
+         k.name AS categoryName,
+         CONCAT(v.vardas, ' ', v.pavarde) AS paidByName
+       FROM Skolos s
+       JOIN Vartotojai v ON s.fk_id_vartotojas = v.id_vartotojas
+       LEFT JOIN kategorijos k ON s.kategorija = k.id_kategorija
+       WHERE s.fk_id_grupe = ?
+       ORDER BY s.sukurimo_data DESC`,
+      [id]
+    )
+
+    // Konvertuojame į frontend formatą
+    const transactions = await Promise.all(
+      debtRows.map(async (debt) => {
+        // Gauname split type
+        const [parts] = await db.query(
+          `SELECT procentas, suma, vaidmuo FROM Skolos_dalys WHERE fk_id_skola = ?`,
+          [debt.id]
+        )
+
+        let splitType = "Lygiai"
+        if (parts.length > 0) {
+          const hasPercent = parts.some(p => p.procentas > 0)
+          const hasCustomAmount = parts.some(p => p.suma > 0 && p.vaidmuo === 1)
+
+          if (hasPercent) splitType = "Procentais"
+          else if (hasCustomAmount) splitType = "Pagal sumas"
+        }
+
+        return {
+          id: debt.id,
+          title: debt.title,
+          description: debt.description || "",
+          amount: Number(debt.amount),
+          currency: debt.valiutos_kodas === 1 ? "EUR" : 
+                   debt.valiutos_kodas === 2 ? "USD" : 
+                   debt.valiutos_kodas === 3 ? "PLN" : 
+                   debt.valiutos_kodas === 4 ? "GBP" : "JPY",
+          date: debt.date,
+          paidBy: debt.paidByName,
+          categoryId: debt.categoryId ? String(debt.categoryId) : null,
+          categoryName: debt.categoryName || "Be kategorijos",
+          splitType
+        }
+      })
+    )
+
     res.json({
       ...groupRows[0],
       members,
+      transactions
     })
   } catch (err) {
     console.error('Klaida gaunant grupę:', err)
