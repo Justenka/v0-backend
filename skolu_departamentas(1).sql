@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 14, 2025 at 12:51 AM
+-- Generation Time: Dec 14, 2025 at 01:57 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -98,18 +98,6 @@ CREATE TABLE `delspinigiai` (
   `aktyvus` tinyint(1) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `delspinigiai`
---
-
-INSERT INTO `delspinigiai` (`id_delspinigiai`, `fk_id_skolos_dalis`, `dienos_proc`, `pradzios_data`, `pabaigos_data`, `apskaiciuota_suma`, `aktyvus`) VALUES
-(5, 127, 5.00, '2025-12-27', NULL, 0.00, 1),
-(6, 128, 5.00, '2025-12-27', NULL, 0.00, 1),
-(7, 129, 5.00, '2025-12-27', NULL, 0.00, 1),
-(8, 130, NULL, '2025-12-27', NULL, 0.00, 1),
-(9, 131, NULL, '2025-12-27', NULL, 0.00, 1),
-(10, 133, NULL, '2025-12-27', NULL, 0.00, 1);
-
 -- --------------------------------------------------------
 
 --
@@ -152,35 +140,19 @@ CREATE TABLE `grupes_istorija` (
 --
 
 INSERT INTO `grupes_istorija` (`id_istorija`, `fk_id_grupe`, `fk_id_vartotojas`, `tipas`, `aprasymas`, `sukurta`, `metadata`) VALUES
-(91, 28, 8, 'group_created', 'Grupė \"bbz\" sukurta.', '2025-12-12 20:07:38', '{\"ownerId\":8}'),
-(92, 28, 8, 'member_added', 'Pridėtas narys \"test1 test1\".', '2025-12-12 20:07:50', '{\"memberId\":9,\"memberName\":\"test1 test1\",\"memberEmail\":\"test1@example.com\"}'),
-(93, 28, 8, 'member_added', 'Pridėtas narys \"test2 test2\".', '2025-12-12 20:07:54', '{\"memberId\":10,\"memberName\":\"test2 test2\",\"memberEmail\":\"test2@example.com\"}'),
-(94, 28, 8, 'expense_added', 'Išlaida \"nahui\" pridėta (30 EUR).', '2025-12-12 20:08:07', '{\"debtId\":41,\"amount\":30,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8}'),
-(95, 28, 8, 'expense_added', 'Išlaida \"bbz\" pridėta (2344234 JPY).', '2025-12-12 20:09:22', '{\"debtId\":42,\"amount\":2344234,\"currencyCode\":\"JPY\",\"paidByUserId\":8,\"createdByUserId\":8}'),
-(96, 28, 8, 'expense_deleted', 'Išlaida \"bbz\" panaikinta (2344234 JPY).', '2025-12-12 20:13:47', '{\"debtId\":42,\"amount\":2344234,\"currencyCode\":\"JPY\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
-(97, 28, 8, 'expense_deleted', 'Išlaida \"Išlyginta skola\" panaikinta (4280.24 EUR).', '2025-12-12 20:13:50', '{\"debtId\":44,\"amount\":4280.24,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
-(98, 28, 8, 'expense_deleted', 'Išlaida \"Išlyginta skola\" panaikinta (4280.24 EUR).', '2025-12-12 20:13:52', '{\"debtId\":43,\"amount\":4280.24,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
-(99, 28, 8, 'expense_deleted', 'Išlaida \"nahui\" panaikinta (30 EUR).', '2025-12-12 20:13:55', '{\"debtId\":41,\"amount\":30,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
-(100, 28, 8, 'expense_added', 'Išlaida \"3333\" pridėta (4 USD).', '2025-12-12 20:14:21', '{\"debtId\":45,\"amount\":4,\"currencyCode\":\"USD\",\"paidByUserId\":9,\"createdByUserId\":8}'),
-(101, 28, 8, 'payment_registered', 'Mokėjimas užregistruotas: Kazkas Kazkas → test1 test1, suma 0.5688149688149688 EUR (0.57 EUR).', '2025-12-12 20:14:36', '{\"groupId\":28,\"fromUserId\":8,\"toUserId\":9,\"amount\":0.5688149688149688,\"originalAmount\":0.5688149688149688,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}'),
-(102, 28, 8, 'payment_registered', 'Mokėjimas užregistruotas: Kazkas Kazkas → test1 test1, suma 0.57 EUR (0.57 EUR).', '2025-12-12 20:14:53', '{\"groupId\":28,\"fromUserId\":8,\"toUserId\":9,\"amount\":0.57,\"originalAmount\":0.57,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}'),
-(103, 28, 8, 'expense_added', 'Išlaida \"data\" pridėta (234 EUR).', '2025-12-12 21:19:08', '{\"debtId\":46,\"amount\":234,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8}'),
-(104, 28, 8, 'expense_added', 'Išlaida \"fghfhg\" pridėta (45645 EUR).', '2025-12-12 21:34:29', '{\"debtId\":47,\"amount\":45645,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8}'),
-(105, 28, 8, 'expense_added', 'Išlaida \"sdfg\" pridėta (34534 EUR).', '2025-12-12 22:28:05', '{\"debtId\":50,\"amount\":34534,\"currencyCode\":\"EUR\",\"paidByUserId\":9,\"createdByUserId\":8}'),
-(106, 28, 8, 'expense_deleted', 'Išlaida \"Išlyginta skola\" panaikinta (15293 EUR).', '2025-12-12 22:42:39', '{\"debtId\":49,\"amount\":15293,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
-(107, 28, 8, 'invite_created', 'Sugeneruota kvietimo nuoroda.', '2025-12-13 02:16:46', '{\"inviteId\":1}'),
-(108, 28, 8, 'expense_edited', 'Išlaida \"dataaaa\" atnaujinta (pavadinimas: data → dataaaa).', '2025-12-13 03:21:57', '{\"debtId\":46,\"editedByUserId\":8,\"changedFields\":[{\"field\":\"title\",\"label\":\"pavadinimas\",\"oldValue\":\"data\",\"newValue\":\"dataaaa\"}]}'),
-(109, 28, 8, 'expense_edited', 'Išlaida \"dataaaaaaa\" atnaujinta (pavadinimas: dataaaa → dataaaaaaa).', '2025-12-13 03:22:04', '{\"debtId\":46,\"editedByUserId\":8,\"changedFields\":[{\"field\":\"title\",\"label\":\"pavadinimas\",\"oldValue\":\"dataaaa\",\"newValue\":\"dataaaaaaa\"}]}'),
-(110, 28, 8, 'expense_edited', 'Išlaida \"dataaaaaaa\" atnaujinta (kategorija: Mokesčiai → Dovanos).', '2025-12-13 03:22:09', '{\"debtId\":46,\"editedByUserId\":8,\"changedFields\":[{\"field\":\"categoryId\",\"label\":\"kategorija\",\"oldValue\":\"Mokesčiai\",\"newValue\":\"Dovanos\",\"oldId\":9,\"newId\":6}]}'),
-(111, 28, 8, 'expense_added', 'Išlaida \"skoas\" pridėta (10 EUR).', '2025-12-13 03:27:52', '{\"debtId\":56,\"amount\":10,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}'),
-(112, 28, 8, 'expense_edited', 'Išlaida \"skola\" atnaujinta (pavadinimas: skoas → skola).', '2025-12-13 13:55:47', '{\"debtId\":56,\"editedByUserId\":8,\"changedFields\":[{\"field\":\"title\",\"label\":\"pavadinimas\",\"oldValue\":\"skoas\",\"newValue\":\"skola\"}]}'),
-(113, 28, 8, 'expense_added', 'Išlaida \"koksas\" pridėta (42 PLN).', '2025-12-13 15:09:49', '{\"debtId\":57,\"amount\":42,\"currencyCode\":\"PLN\",\"paidByUserId\":9,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}'),
-(114, 28, 8, 'invite_created', 'Sugeneruota kvietimo nuoroda.', '2025-12-13 15:24:07', '{\"inviteId\":2}'),
-(115, 28, 8, 'expense_added', 'Išlaida \"Modulio skola\" pridėta (410.82 EUR) su delspinigiais 5% per dieną.', '2025-12-13 23:10:16', '{\"debtId\":60,\"amount\":410.82,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8,\"lateFeePercentage\":5,\"lateFeeAfterDays\":7}'),
-(116, 28, 8, 'expense_added', 'Išlaida \"Baidarės\" pridėta (500 PLN).', '2025-12-13 23:19:16', '{\"debtId\":61,\"amount\":500,\"currencyCode\":\"PLN\",\"paidByUserId\":10,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}'),
-(119, 28, 8, 'invite_created', 'Sugeneruota kvietimo nuoroda.', '2025-12-13 23:59:46', '{\"inviteId\":4}'),
-(120, 28, 8, 'invite_created', 'Sugeneruota kvietimo nuoroda.', '2025-12-14 00:00:49', '{\"inviteId\":5}'),
-(122, 28, 14, 'payment_registered', 'Mokėjimas užregistruotas: Arnoldas Skrodenis → Tomas Barisauskas, suma 66.16 EUR (66.16 EUR).', '2025-12-14 00:20:46', '{\"groupId\":28,\"fromUserId\":14,\"toUserId\":8,\"amount\":66.16,\"originalAmount\":66.16,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}');
+(129, 28, 8, 'expense_deleted', 'Išlaida \"papparsta\" panaikinta (5 EUR).', '2025-12-14 13:43:03', '{\"debtId\":68,\"amount\":5,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
+(130, 28, 8, 'expense_added', 'Išlaida \"999999\" pridėta (999999 EUR).', '2025-12-14 13:43:38', '{\"debtId\":69,\"amount\":999999,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}'),
+(131, 28, 8, 'expense_deleted', 'Išlaida \"999999\" panaikinta (999999 EUR).', '2025-12-14 13:43:43', '{\"debtId\":69,\"amount\":999999,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
+(132, 28, 8, 'expense_edited', 'Išlaida \"Obuoliai\" atnaujinta (pavadinimas: striptizas → Obuoliai).', '2025-12-14 13:44:25', '{\"debtId\":66,\"editedByUserId\":8,\"changedFields\":[{\"field\":\"title\",\"label\":\"pavadinimas\",\"oldValue\":\"striptizas\",\"newValue\":\"Obuoliai\"}]}'),
+(133, 28, 8, 'expense_deleted', 'Išlaida \"su delspinigiais\" panaikinta (45645 EUR).', '2025-12-14 14:08:51', '{\"debtId\":67,\"amount\":45645,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"deletedByUserId\":8}'),
+(134, 28, 14, 'payment_registered', 'Mokėjimas užregistruotas: Arnoldas Skrodenis → Tomas Barisauskas, suma 10 EUR (10.00 EUR).', '2025-12-14 14:09:19', '{\"groupId\":28,\"fromUserId\":14,\"toUserId\":8,\"amount\":10,\"originalAmount\":10,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}'),
+(135, 28, 14, 'payment_registered', 'Mokėjimas užregistruotas: Arnoldas Skrodenis → Zivile Nuobaraite, suma 5 EUR (5.00 EUR).', '2025-12-14 14:11:07', '{\"groupId\":28,\"fromUserId\":14,\"toUserId\":9,\"amount\":5,\"originalAmount\":5,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}'),
+(136, 28, 8, 'member_removed', 'Pašalintas narys \"Arnoldas Skrodenis\".', '2025-12-14 14:11:14', '{\"memberId\":14,\"memberName\":\"Arnoldas Skrodenis\",\"memberEmail\":\"Arnoldas@skrodenis.com\"}'),
+(137, 28, 10, 'payment_registered', 'Mokėjimas užregistruotas: Justinas Jankauskas → Zivile Nuobaraite, suma 5 EUR (5.00 EUR).', '2025-12-14 14:13:23', '{\"groupId\":28,\"fromUserId\":10,\"toUserId\":9,\"amount\":5,\"originalAmount\":5,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}'),
+(138, 28, 10, 'payment_registered', 'Mokėjimas užregistruotas: Justinas Jankauskas → Tomas Barisauskas, suma 10 EUR (10.00 EUR).', '2025-12-14 14:13:25', '{\"groupId\":28,\"fromUserId\":10,\"toUserId\":8,\"amount\":10,\"originalAmount\":10,\"currencyCode\":\"EUR\",\"conversionRate\":1,\"note\":null,\"affectedPartsCount\":1}'),
+(139, 28, 8, 'expense_added', 'Išlaida \"vbcvb\" pridėta (420 PLN).', '2025-12-14 14:32:49', '{\"debtId\":70,\"amount\":420,\"currencyCode\":\"PLN\",\"paidByUserId\":8,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}'),
+(140, 28, 8, 'expense_added', 'Išlaida \"Modulio skola\" pridėta (410.82 EUR).', '2025-12-14 14:41:38', '{\"debtId\":71,\"amount\":410.82,\"currencyCode\":\"EUR\",\"paidByUserId\":8,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}'),
+(141, 28, 8, 'expense_added', 'Išlaida \"Baidarės\" pridėta (500 PLN).', '2025-12-14 14:42:21', '{\"debtId\":72,\"amount\":500,\"currencyCode\":\"PLN\",\"paidByUserId\":10,\"createdByUserId\":8,\"lateFeePercentage\":null,\"lateFeeAfterDays\":null}');
 
 -- --------------------------------------------------------
 
@@ -205,7 +177,8 @@ INSERT INTO `grupes_nariai` (`id_grupes_narys`, `fk_id_grupe`, `fk_id_vartotojas
 (33, 28, 8, '0000-00-00', 3, 1),
 (34, 28, 9, '2025-12-12', 2, 1),
 (35, 28, 10, '2025-12-12', 2, 1),
-(36, 28, 14, '0000-00-00', 2, 1);
+(36, 28, 14, '0000-00-00', 2, 3),
+(42, 28, 14, '0000-00-00', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -257,8 +230,7 @@ INSERT INTO `kategorijos` (`id_kategorija`, `name`) VALUES
 (7, 'Įranga'),
 (8, 'Bendros išlaidos'),
 (9, 'Mokesčiai'),
-(10, 'Neplanuotos išlaidos'),
-(11, 'Išlyginimas');
+(10, 'Neplanuotos išlaidos');
 
 -- --------------------------------------------------------
 
@@ -283,7 +255,8 @@ INSERT INTO `kvietimai` (`id_kvietimas`, `tokenas`, `sukurimo_data`, `galiojimo_
 (2, 'cJHLhekkH5', '2025-12-13', '2025-12-20', 1),
 (3, 'LyhwoBlA3H', '2025-12-13', '2025-12-20', 2),
 (4, 'qFrPiMk7WK', '2025-12-13', '2025-12-20', 1),
-(5, 'yHaphPdsCz', '2025-12-14', '2025-12-21', 1);
+(5, 'yHaphPdsCz', '2025-12-14', '2025-12-21', 1),
+(8, 'IAMWyAo46j', '2025-12-14', '2025-12-21', 2);
 
 -- --------------------------------------------------------
 
@@ -325,7 +298,8 @@ CREATE TABLE `mokejimai` (
 --
 
 INSERT INTO `mokejimai` (`id_mokejimas`, `fk_id_skolos_dalis`, `fk_id_vartotojas`, `data`, `suma`, `kursas_eurui`) VALUES
-(7, 136, 14, '2025-12-13', 66.16, 1.0000);
+(14, 167, 8, '2025-12-14', 29.60, 1.0000),
+(15, 165, 10, '2025-12-14', 29.60, 1.0000);
 
 -- --------------------------------------------------------
 
@@ -370,62 +344,16 @@ CREATE TABLE `pranesimai` (
 --
 
 INSERT INTO `pranesimai` (`id_pranesimas`, `fk_id_vartotojas`, `tipas`, `pavadinimas`, `tekstas`, `nuskaityta`, `sukurta`, `action_url`, `metadata`) VALUES
-(37, 8, 'group_message', 'Nauja žinutė grupėje \"fff\"', 'test1 test1: aa', 1, '2025-12-11 18:37:27', '/groups/25?tab=chat', '{\"type\":\"group_message\",\"groupId\":25,\"messageId\":54,\"senderId\":9}'),
-(38, 8, 'group_message', 'Nauja žinutė grupėje \"fff\"', 'test1 test1: aa', 1, '2025-12-11 18:37:47', '/groups/25?tab=chat', '{\"type\":\"group_message\",\"groupId\":25,\"messageId\":55,\"senderId\":9}'),
-(39, 8, 'friend_request', 'Naujas draugo kvietimas', 'test1 test1 pakvietė jus draugauti', 1, '2025-12-11 18:38:06', '/friends', NULL),
-(40, 8, 'group_message', 'Nauja žinutė grupėje \"fff\"', 'test1 test1: aa', 1, '2025-12-11 18:39:07', '/groups/25?tab=chat', '{\"type\":\"group_message\",\"groupId\":25,\"messageId\":57,\"senderId\":9}'),
-(41, 8, 'friend_request', 'Naujas draugo kvietimas', 'test1 test1 pakvietė jus draugauti', 1, '2025-12-11 18:56:24', '/friends', NULL),
-(42, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „123“ (123 EUR).', 0, '2025-12-11 21:01:54', '/groups/25', NULL),
-(43, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „1345“ (123 EUR).', 0, '2025-12-11 21:02:48', '/groups/25', NULL),
-(44, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „testas“ (100 EUR).', 0, '2025-12-11 21:11:34', '/groups/25', NULL),
-(45, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „test“ (100 EUR).', 0, '2025-12-11 21:12:09', '/groups/25', NULL),
-(46, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „kkkkkk“ (15 EUR).', 0, '2025-12-11 21:13:16', '/groups/25', NULL),
-(47, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „ikiiii“ (5 EUR).', 0, '2025-12-11 21:13:49', '/groups/25', NULL),
-(48, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „aaaa“ (15 EUR).', 0, '2025-12-11 21:14:54', '/groups/25', NULL),
-(49, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „aaaaaaaaaa“ (150 EUR).', 0, '2025-12-11 21:15:31', '/groups/25', NULL),
-(50, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „asd“ (100 EUR).', 0, '2025-12-11 21:23:00', '/groups/25', NULL),
-(51, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „aaaa“ (100 EUR).', 0, '2025-12-11 21:23:11', '/groups/25', NULL),
-(52, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „asd“ (15 EUR).', 0, '2025-12-11 21:24:09', '/groups/25', NULL),
-(53, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „fdgh“ (150 EUR).', 0, '2025-12-11 21:24:29', '/groups/25', NULL),
-(54, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „44“ (100 EUR).', 0, '2025-12-11 21:25:01', '/groups/25', NULL),
-(55, 9, 'new_expense', 'Nauja išlaida grupėje \"fff\"', 'Kazkas Kazkas pridėjo išlaidą „4444“ (200 EUR).', 0, '2025-12-11 21:25:23', '/groups/25', NULL),
-(56, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „nahui“ (30 EUR).', 0, '2025-12-12 20:08:07', '/groups/28', NULL),
-(57, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „nahui“ (30 EUR).', 0, '2025-12-12 20:08:07', '/groups/28', NULL),
-(58, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „bbz“ (2344234 JPY).', 0, '2025-12-12 20:09:22', '/groups/28', NULL),
-(59, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „bbz“ (2344234 JPY).', 0, '2025-12-12 20:09:22', '/groups/28', NULL),
-(60, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „3333“ (4 USD).', 0, '2025-12-12 20:14:21', '/groups/28', NULL),
-(61, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „3333“ (4 USD).', 0, '2025-12-12 20:14:21', '/groups/28', NULL),
-(62, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „data“ (234 EUR).', 0, '2025-12-12 21:19:08', '/groups/28', NULL),
-(63, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „data“ (234 EUR).', 0, '2025-12-12 21:19:08', '/groups/28', NULL),
-(64, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „fghfhg“ (45645 EUR).', 0, '2025-12-12 21:34:29', '/groups/28', NULL),
-(65, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „fghfhg“ (45645 EUR).', 0, '2025-12-12 21:34:29', '/groups/28', NULL),
-(66, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „sdfg“ (34534 EUR).', 0, '2025-12-12 22:28:05', '/groups/28', NULL),
-(67, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „sdfg“ (34534 EUR).', 0, '2025-12-12 22:28:05', '/groups/28', NULL),
-(68, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „skoas“ (10 EUR).', 0, '2025-12-13 03:27:52', '/groups/28', NULL),
-(69, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „skoas“ (10 EUR).', 0, '2025-12-13 03:27:52', '/groups/28', NULL),
-(70, 9, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „koksas“ (42 PLN).', 0, '2025-12-13 15:09:49', '/groups/28', NULL),
-(71, 10, 'new_expense', 'Nauja išlaida grupėje \"bbz\"', 'Kazkas Kazkas pridėjo išlaidą „koksas“ (42 PLN).', 0, '2025-12-13 15:09:49', '/groups/28', NULL),
-(72, 9, 'friend_request', 'Naujas draugo kvietimas', 'Tomas Barisauskas pakvietė jus draugauti', 0, '2025-12-13 22:15:14', '/friends', NULL),
-(73, 10, 'friend_request', 'Naujas draugo kvietimas', 'Tomas Barisauskas pakvietė jus draugauti', 0, '2025-12-13 22:15:48', '/friends', NULL),
-(74, 14, 'friend_request', 'Naujas draugo kvietimas', 'Tomas Barisauskas pakvietė jus draugauti', 0, '2025-12-13 22:16:02', '/friends', NULL),
-(75, 14, 'friend_request', 'Naujas draugo kvietimas', 'Zivile Nuobaraite pakvietė jus draugauti', 0, '2025-12-13 22:16:15', '/friends', NULL),
-(76, 10, 'friend_request', 'Naujas draugo kvietimas', 'Zivile Nuobaraite pakvietė jus draugauti', 0, '2025-12-13 22:16:23', '/friends', NULL),
-(77, 14, 'friend_request', 'Naujas draugo kvietimas', 'Justinas Jankauskas pakvietė jus draugauti', 0, '2025-12-13 22:17:03', '/friends', NULL),
-(78, 14, 'group_invite', 'Kvietimas į grupę', 'Tomas Barisauskas pakvietė jus prisijungti prie grupės „Skolininkai“', 1, '2025-12-13 22:30:52', '/groups/28/join?token=LyhwoBlA3H', '{\"type\":\"group_invite\",\"groupId\":28,\"inviteId\":3,\"token\":\"LyhwoBlA3H\",\"inviterId\":8}'),
-(79, 9, 'new_expense', 'Nauja išlaida grupėje \"Skolininkai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-13 23:10:16', '/groups/28', NULL),
-(80, 14, 'new_expense', 'Nauja išlaida grupėje \"Skolininkai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-13 23:10:16', '/groups/28', NULL),
-(81, 10, 'new_expense', 'Nauja išlaida grupėje \"Skolininkai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-13 23:10:16', '/groups/28', NULL),
-(82, 9, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-13 23:19:16', '/groups/28', NULL),
-(83, 14, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-13 23:19:16', '/groups/28', NULL),
-(84, 10, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-13 23:19:16', '/groups/28', NULL),
-(85, 9, 'group_message', 'Nauja žinutė grupėje \"Teletabiai\"', 'Tomas Barisauskas: sveiki', 0, '2025-12-14 01:04:29', '/groups/28?tab=chat', '{\"type\":\"group_message\",\"groupId\":28,\"messageId\":58,\"senderId\":8}'),
-(86, 14, 'group_message', 'Nauja žinutė grupėje \"Teletabiai\"', 'Tomas Barisauskas: sveiki', 0, '2025-12-14 01:04:29', '/groups/28?tab=chat', '{\"type\":\"group_message\",\"groupId\":28,\"messageId\":58,\"senderId\":8}'),
-(87, 10, 'group_message', 'Nauja žinutė grupėje \"Teletabiai\"', 'Tomas Barisauskas: sveiki', 0, '2025-12-14 01:04:29', '/groups/28?tab=chat', '{\"type\":\"group_message\",\"groupId\":28,\"messageId\":58,\"senderId\":8}'),
-(88, 8, 'group_message', 'Nauja žinutė grupėje \"Teletabiai\"', 'Justinas Jankauskas: wassup', 0, '2025-12-14 01:05:05', '/groups/28?tab=chat', '{\"type\":\"group_message\",\"groupId\":28,\"messageId\":59,\"senderId\":10}'),
-(89, 9, 'group_message', 'Nauja žinutė grupėje \"Teletabiai\"', 'Justinas Jankauskas: wassup', 0, '2025-12-14 01:05:05', '/groups/28?tab=chat', '{\"type\":\"group_message\",\"groupId\":28,\"messageId\":59,\"senderId\":10}'),
-(90, 14, 'group_message', 'Nauja žinutė grupėje \"Teletabiai\"', 'Justinas Jankauskas: wassup', 0, '2025-12-14 01:05:05', '/groups/28?tab=chat', '{\"type\":\"group_message\",\"groupId\":28,\"messageId\":59,\"senderId\":10}'),
-(91, 8, 'group_invite', 'Kvietimas į grupę', 'Justinas Jankauskas pakvietė jus prisijungti prie grupės „TeIetabiai“', 1, '2025-12-14 01:20:33', '/groups/31/join?token=2jgFgnPxEF', '{\"type\":\"group_invite\",\"groupId\":31,\"inviteId\":6,\"token\":\"2jgFgnPxEF\",\"inviterId\":10}'),
-(92, 8, 'group_invite', 'Kvietimas į grupę', 'Justinas Jankauskas pakvietė jus prisijungti prie grupės „TeIetabiai“', 1, '2025-12-14 01:21:32', '/groups/31/join?token=xSjmsMmRl7', '{\"type\":\"group_invite\",\"groupId\":31,\"inviteId\":7,\"token\":\"xSjmsMmRl7\",\"inviterId\":10}');
+(110, 10, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „vbcvb“ (420 PLN).', 0, '2025-12-14 14:32:49', '/groups/28', NULL),
+(111, 14, 'group_invite', 'Kvietimas į grupę', 'Tomas Barisauskas pakvietė jus prisijungti prie grupės „Teletabiai“', 1, '2025-12-14 14:33:55', '/groups/28/join?token=IAMWyAo46j', '{\"type\":\"group_invite\",\"groupId\":28,\"inviteId\":8,\"token\":\"IAMWyAo46j\",\"inviterId\":8}'),
+(112, 9, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-14 14:41:38', '/groups/28', NULL),
+(113, 10, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-14 14:41:38', '/groups/28', NULL),
+(114, 14, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-14 14:41:38', '/groups/28', NULL),
+(115, 14, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Modulio skola“ (410.82 EUR).', 0, '2025-12-14 14:41:38', '/groups/28', NULL),
+(116, 9, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-14 14:42:21', '/groups/28', NULL),
+(117, 10, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-14 14:42:21', '/groups/28', NULL),
+(118, 14, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-14 14:42:21', '/groups/28', NULL),
+(119, 14, 'new_expense', 'Nauja išlaida grupėje \"Teletabiai\"', 'Tomas Barisauskas pridėjo išlaidą „Baidarės“ (500 PLN).', 0, '2025-12-14 14:42:21', '/groups/28', NULL);
 
 -- --------------------------------------------------------
 
@@ -521,11 +449,8 @@ CREATE TABLE `skolos` (
 --
 
 INSERT INTO `skolos` (`id_skola`, `fk_id_grupe`, `fk_id_vartotojas`, `pavadinimas`, `aprasymas`, `suma`, `kursas_eurui`, `sukurimo_data`, `paskutinio_keitimo_data`, `terminas`, `valiutos_kodas`, `skolos_statusas`, `kategorija`) VALUES
-(60, 28, 8, 'Modulio skola', NULL, 410.82, 1.0000, '2025-12-13', '2025-12-13', '2025-12-20', 1, 2, 9),
-(61, 28, 10, 'Baidarės', NULL, 500.00, 4.2225, '2025-12-13', '2025-12-13', '2025-12-20', 3, 2, 4),
-(62, 28, 8, 'Išlyginta skola', 'Automatiškai išlyginta skola', 132.31, 1.0000, '2025-12-13', '2025-12-13', '2026-01-12', 1, 1, 11),
-(63, 28, 8, 'Išlyginta skola', 'Automatiškai išlyginta skola', 132.31, 1.0000, '2025-12-13', '2025-12-13', '2026-01-12', 1, 1, 11),
-(64, 28, 8, 'Išlyginta skola', 'Automatiškai išlyginta skola', 13.91, 1.0000, '2025-12-13', '2025-12-13', '2026-01-12', 1, 1, 11);
+(71, 28, 8, 'Modulio skola', NULL, 410.82, 1.0000, '2025-12-14', '2025-12-14', '2025-12-21', 1, 1, 10),
+(72, 28, 10, 'Baidarės', NULL, 500.00, 4.2225, '2025-12-14', '2025-12-14', '2025-12-21', 3, 1, 4);
 
 -- --------------------------------------------------------
 
@@ -550,20 +475,14 @@ CREATE TABLE `skolos_dalys` (
 --
 
 INSERT INTO `skolos_dalys` (`id_skolos_dalis`, `fk_id_skola`, `fk_id_vartotojas`, `suma`, `procentas`, `apmoketa`, `sumoketa`, `delspinigiai`, `vaidmuo`) VALUES
-(126, 60, 8, 102.71, 25.00, 1, 102.71, 0, 2),
-(127, 60, 9, 102.71, 25.00, 0, 0.00, 1, 1),
-(128, 60, 10, 102.71, 25.00, 0, 0.00, 1, 1),
-(129, 60, 14, 102.71, 25.00, 0, 0.00, 1, 1),
-(130, 61, 8, 29.60, 25.00, 0, 0.00, 1, 1),
-(131, 61, 9, 29.60, 25.00, 0, 0.00, 1, 1),
-(132, 61, 10, 29.60, 25.00, 1, 29.60, 0, 2),
-(133, 61, 14, 29.60, 25.00, 0, 0.00, 1, 1),
-(134, 62, 9, 132.31, 100.00, 0, 0.00, 0, 1),
-(135, 62, 8, 132.31, 0.00, 1, 0.00, 0, 2),
-(136, 63, 14, 132.31, 100.00, 0, 66.16, 0, 1),
-(137, 63, 8, 132.31, 0.00, 1, 0.00, 0, 2),
-(138, 64, 10, 13.91, 100.00, 0, 0.00, 0, 1),
-(139, 64, 8, 13.91, 0.00, 1, 0.00, 0, 2);
+(163, 71, 8, 102.71, 25.00, 1, 102.71, 0, 2),
+(164, 71, 9, 102.71, 25.00, 0, 0.00, 1, 1),
+(165, 71, 10, 102.71, 25.00, 0, 29.60, 1, 1),
+(166, 71, 14, 102.71, 25.00, 0, 0.00, 1, 1),
+(167, 72, 8, 29.60, 25.00, 1, 29.60, 1, 1),
+(168, 72, 9, 29.60, 25.00, 0, 0.00, 1, 1),
+(169, 72, 10, 29.60, 25.00, 1, 29.60, 0, 2),
+(170, 72, 14, 29.60, 25.00, 0, 0.00, 1, 1);
 
 -- --------------------------------------------------------
 
@@ -633,7 +552,8 @@ INSERT INTO `sukuria` (`fk_id_kvietimas`, `fk_id_grupes_narys`) VALUES
 (2, 33),
 (3, 33),
 (4, 33),
-(5, 33);
+(5, 33),
+(8, 33);
 
 -- --------------------------------------------------------
 
@@ -700,10 +620,10 @@ CREATE TABLE `vartotojai` (
 --
 
 INSERT INTO `vartotojai` (`id_vartotojas`, `vardas`, `pavarde`, `el_pastas`, `slaptazodis_hash`, `sukurimo_data`, `paskutinis_prisijungimas`, `valiutos_kodas`, `avatar_url`) VALUES
-(8, 'Tomas', 'Barisauskas', 'tomas@barisauskas.com', '86c496b088a575d69a92159ee06bfb4dec33d649a5b4433d2c8c95f403a67d69', '2025-12-03 15:40:21', '2025-12-14 00:21:40', 3, '/uploads/avatars/1765318585169-8471192.png'),
+(8, 'Tomas', 'Barisauskas', 'tomas@barisauskas.com', '86c496b088a575d69a92159ee06bfb4dec33d649a5b4433d2c8c95f403a67d69', '2025-12-03 15:40:21', '2025-12-14 13:23:26', 1, '/uploads/avatars/1765318585169-8471192.png'),
 (9, 'Zivile', 'Nuobaraite', 'Zivile@nuobaraite.com', '8d216ac1e0cf5a2b0a23f69421481120509b1bcf3efe115205710373f7ceab01', '2025-12-03 18:39:07', '2025-12-13 22:15:31', 1, '/uploads/avatars/1765318616988-507908848.png'),
-(10, 'Justinas', 'Jankauskas', 'Justinas@jankauskas.com', '6bc7980ed246713f1c92b9b81b380fb02dc016e52d1731e9e4b1b493fa5dc95d', '2025-12-03 19:16:25', '2025-12-14 01:37:09', 1, '/uploads/avatars/1765319419696-742828989.png'),
-(14, 'Arnoldas', 'Skrodenis', 'Arnoldas@skrodenis.com', 'b7abe9f463561827c43adc8350dc505a463d39f2e70979460d260ea2c3e05749', '2025-12-13 21:57:15', '2025-12-14 00:20:03', 1, NULL);
+(10, 'Justinas', 'Jankauskas', 'Justinas@jankauskas.com', '6bc7980ed246713f1c92b9b81b380fb02dc016e52d1731e9e4b1b493fa5dc95d', '2025-12-03 19:16:25', '2025-12-14 14:13:17', 1, '/uploads/avatars/1765319419696-742828989.png'),
+(14, 'Arnoldas', 'Skrodenis', 'Arnoldas@skrodenis.com', 'b7abe9f463561827c43adc8350dc505a463d39f2e70979460d260ea2c3e05749', '2025-12-13 21:57:15', '2025-12-14 14:34:09', 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -951,7 +871,7 @@ ALTER TABLE `ataskaitos_tipas`
 -- AUTO_INCREMENT for table `delspinigiai`
 --
 ALTER TABLE `delspinigiai`
-  MODIFY `id_delspinigiai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id_delspinigiai` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `grupes`
@@ -963,13 +883,13 @@ ALTER TABLE `grupes`
 -- AUTO_INCREMENT for table `grupes_istorija`
 --
 ALTER TABLE `grupes_istorija`
-  MODIFY `id_istorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=125;
+  MODIFY `id_istorija` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=142;
 
 --
 -- AUTO_INCREMENT for table `grupes_nariai`
 --
 ALTER TABLE `grupes_nariai`
-  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+  MODIFY `id_grupes_narys` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT for table `grupes_zinutes`
@@ -987,7 +907,7 @@ ALTER TABLE `kategorijos`
 -- AUTO_INCREMENT for table `kvietimai`
 --
 ALTER TABLE `kvietimai`
-  MODIFY `id_kvietimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id_kvietimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `kvietimo_busenos`
@@ -999,7 +919,7 @@ ALTER TABLE `kvietimo_busenos`
 -- AUTO_INCREMENT for table `mokejimai`
 --
 ALTER TABLE `mokejimai`
-  MODIFY `id_mokejimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id_mokejimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `nariu_busenos`
@@ -1011,7 +931,7 @@ ALTER TABLE `nariu_busenos`
 -- AUTO_INCREMENT for table `pranesimai`
 --
 ALTER TABLE `pranesimai`
-  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=93;
+  MODIFY `id_pranesimas` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=120;
 
 --
 -- AUTO_INCREMENT for table `pranesimo_busenos`
@@ -1035,13 +955,13 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT for table `skolos`
 --
 ALTER TABLE `skolos`
-  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
+  MODIFY `id_skola` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
 
 --
 -- AUTO_INCREMENT for table `skolos_dalys`
 --
 ALTER TABLE `skolos_dalys`
-  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=140;
+  MODIFY `id_skolos_dalis` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=171;
 
 --
 -- AUTO_INCREMENT for table `skolu_statusai`

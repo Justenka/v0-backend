@@ -696,6 +696,9 @@ router.get('/api/categories-by-group/:groupId', async (req, res) => {
 // ------------------------------------------
 // Ištrinti skolą (išlaidą)
 // ------------------------------------------
+// ------------------------------------------
+// Ištrinti skolą (išlaidą)
+// ------------------------------------------
 router.delete('/api/debts/:debtId', async (req, res) => {
   const { debtId } = req.params;
 
@@ -713,7 +716,7 @@ router.delete('/api/debts/:debtId', async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Pasiimam skolos info, kad būtų ką įrašyti į istoriją
+    // 1. Pasiimam skolos info
     const [debtRows] = await connection.query(
       `SELECT 
          s.fk_id_vartotojas AS paidById,
@@ -733,13 +736,39 @@ router.delete('/api/debts/:debtId', async (req, res) => {
 
     const { paidById, groupId, title, amount, valiutos_kodas } = debtRows[0];
 
-    // 3. Trinam dalis ir pačią skolą
+    // 2. Patikrinam ar yra mokėjimų šiai skolai
+    const [paymentCheck] = await connection.query(
+      `SELECT COUNT(*) as paymentCount
+       FROM Mokejimai m
+       INNER JOIN Skolos_dalys sd ON m.fk_id_skolos_dalis = sd.id_skolos_dalis
+       WHERE sd.fk_id_skola = ?`,
+      [debtId]
+    );
+
+    if (paymentCheck[0].paymentCount > 0) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        message: 'Negalima ištrinti išlaidos - jau yra pradėta mokėti už šią skolą' 
+      });
+    }
+
+    // 3. Ištrinti delspinigius, susijusius su šios skolos dalimis
+    await connection.query(
+      `DELETE d FROM Delspinigiai d
+       INNER JOIN Skolos_dalys sd ON d.fk_id_skolos_dalis = sd.id_skolos_dalis
+       WHERE sd.fk_id_skola = ?`,
+      [debtId]
+    );
+
+    // 4. Ištrinti skolos dalis
     await connection.query(`DELETE FROM Skolos_dalys WHERE fk_id_skola = ?`, [debtId]);
+
+    // 5. Ištrinti pačią skolą
     await connection.query(`DELETE FROM Skolos WHERE id_skola = ?`, [debtId]);
 
     await connection.commit();
 
-    // 4. ĮRAŠOM Į ISTORIJĄ (po commit, kad nebūtų deadlockų)
+    // 6. ĮRAŠOM Į ISTORIJĄ (po commit, kad nebūtų deadlockų)
     const historyUserId = actorId ?? Number(paidById);
 
     const currencyCode =
