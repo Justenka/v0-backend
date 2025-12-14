@@ -603,10 +603,10 @@ router.post('/api/debts', async (req, res) => {
         // jei nustatymuose išjungta – skipinam
         if (!m.naujos_islaidos) continue;
 
-        // 4) Sukuriam pranešimą Pranesimai lentelėje
+        // 4) Sukuriam pranešimą sisteminiai_pranesimai lentelėje
         await db.query(
           `
-          INSERT INTO Pranesimai
+          INSERT INTO sisteminiai_pranesimai
             (fk_id_vartotojas, tipas, pavadinimas, tekstas, action_url)
           VALUES (?, 'new_expense', ?, ?, ?)
           `,

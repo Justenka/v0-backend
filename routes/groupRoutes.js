@@ -377,12 +377,20 @@ router.post("/api/groups/:groupId/members", async (req, res) => {
   }
 });
 
+
+
 // PUT /api/groups/:groupId/members/:userId/role
 router.put("/api/groups/:groupId/members/:userId/role", async (req, res) => {
   const groupId = Number(req.params.groupId)
   const targetUserId = Number(req.params.userId)
   const actorId = Number(req.header("x-user-id")) || null
   const { role } = req.body || {} // expects 1|2|3
+  const roleText = (r) => {
+    const n = Number(r)
+    if (n === 3) return "Administratorius"
+    if (n === 2) return "Narys"
+    return "Svečias"
+  }
 
   if (!actorId) return res.status(401).json({ message: "Trūksta x-user-id" })
   if (!groupId || !targetUserId) return res.status(400).json({ message: "Blogi parametrai" })
@@ -392,6 +400,20 @@ router.put("/api/groups/:groupId/members/:userId/role", async (req, res) => {
   const ROLE_MEMBER = 2
   const ROLE_ADMIN = 3
   const ACTIVE = 1
+
+  const [targetUserRows] = await db.query(
+      `SELECT vardas, pavarde, el_pastas 
+       FROM Vartotojai 
+       WHERE id_vartotojas = ?
+       LIMIT 1`,
+      [targetUserId]
+    )
+
+  const targetUser = targetUserRows[0] || null
+  const targetName = targetUser
+    ? `${targetUser.vardas} ${targetUser.pavarde || ""}`.trim()
+    : `ID ${targetUserId}`
+  const targetEmail = targetUser?.el_pastas || null
 
   try {
     // 1) actor must be admin in this group
@@ -461,6 +483,25 @@ router.put("/api/groups/:groupId/members/:userId/role", async (req, res) => {
       )
 
       await db.query("COMMIT")
+
+      await addGroupHistoryEntry(
+        groupId,
+        actorId,
+        "role_changed",
+        `Perduotos administratoriaus teisės nariui "${targetName}" (owner perkeltas).`,
+        {
+          memberId: targetUserId,
+          memberName: targetName,
+          memberEmail: targetEmail,
+          oldRole: targetCurrentRole,
+          newRole: ROLE_ADMIN,
+          oldRoleText: roleText(targetCurrentRole),
+          newRoleText: roleText(ROLE_ADMIN),
+          transferred: true,
+          previousAdminId: actorId,
+        }
+      )
+
       return res.json({ ok: true, transferred: true })
     }
 
@@ -471,6 +512,22 @@ router.put("/api/groups/:groupId/members/:userId/role", async (req, res) => {
        WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = ?`,
       [newRole, groupId, targetUserId, ACTIVE]
     )
+
+    await addGroupHistoryEntry(
+    groupId,
+    actorId,
+    "role_changed",
+    `Pakeista nario "${targetName}" rolė: ${roleText(targetCurrentRole)} → ${roleText(newRole)}.`,
+    {
+      memberId: targetUserId,
+      memberName: targetName,
+      memberEmail: targetEmail,
+      oldRole: targetCurrentRole,
+      newRole,
+      oldRoleText: roleText(targetCurrentRole),
+      newRoleText: roleText(newRole),
+    }
+  )
 
     return res.json({ ok: true })
   } catch (err) {
@@ -954,7 +1011,7 @@ router.post("/api/groups/:groupId/invite-friend", async (req, res) => {
     })
 
     await conn.query(
-      `INSERT INTO pranesimai
+      `INSERT INTO sisteminiai_pranesimai
         (fk_id_vartotojas, tipas, pavadinimas, tekstas, action_url, metadata)
        VALUES (?, 'group_invite', ?, ?, ?, ?)`,
       [
@@ -1286,7 +1343,7 @@ async function createGroupMessageNotifications(groupId, senderId, messageRow) {
     for (const u of userRows) {
       await db.query(
         `
-        INSERT INTO Pranesimai
+        INSERT INTO sisteminiai_pranesimai
           (fk_id_vartotojas, tipas, pavadinimas, tekstas, nuskaityta, sukurta, action_url, metadata)
         VALUES
           (?, 'group_message', ?, ?, 0, NOW(), ?, ?)

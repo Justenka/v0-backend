@@ -237,7 +237,7 @@ router.post("/api/friend-requests", async (req, res) => {
 
         await db.query(
           `
-          INSERT INTO Pranesimai
+          INSERT INTO sisteminiai_pranesimai
             (fk_id_vartotojas, tipas, pavadinimas, tekstas, action_url)
           VALUES (?, 'friend_request', ?, ?, ?)
           `,

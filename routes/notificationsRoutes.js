@@ -30,7 +30,7 @@ router.get("/api/notifications", async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT *
-      FROM Pranesimai
+      FROM sisteminiai_pranesimai
       WHERE fk_id_vartotojas = ?
       ORDER BY sukurta DESC
       `,
@@ -57,7 +57,7 @@ router.patch("/api/notifications/:id/read", async (req, res) => {
 
     const [result] = await db.query(
       `
-      UPDATE Pranesimai
+      UPDATE sisteminiai_pranesimai
       SET nuskaityta = 1
       WHERE id_pranesimas = ? AND fk_id_vartotojas = ?
       `,
@@ -85,7 +85,7 @@ router.patch("/api/notifications/mark-all-read", async (req, res) => {
 
     await db.query(
       `
-      UPDATE Pranesimai
+      UPDATE sisteminiai_pranesimai
       SET nuskaityta = 1
       WHERE fk_id_vartotojas = ?
       `,
@@ -110,7 +110,7 @@ router.get("/api/notifications/unread-count", async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT COUNT(*) AS cnt
-      FROM Pranesimai
+      FROM sisteminiai_pranesimai
       WHERE fk_id_vartotojas = ?
         AND nuskaityta = 0
       `,
@@ -137,7 +137,7 @@ router.delete("/api/notifications/clear-all", async (req, res) => {
 
     await db.query(
       `
-      DELETE FROM Pranesimai
+      DELETE FROM sisteminiai_pranesimai
       WHERE fk_id_vartotojas = ?
       `,
       [userId],
@@ -164,7 +164,7 @@ router.delete("/api/notifications/:id", async (req, res) => {
 
     const [result] = await db.query(
       `
-      DELETE FROM Pranesimai
+      DELETE FROM sisteminiai_pranesimai
       WHERE id_pranesimas = ?
         AND fk_id_vartotojas = ?
       `,
