@@ -19,6 +19,7 @@ const { startCurrencyUpdater } = require("./routes/currencyUpdater");
 const settingsRoutes = require("./routes/settingsRoutes");
 const notificationsRoutes = require("./routes/notificationsRoutes");
 const { scheduleLateFeeUpdates, updateLateFees } = require('./routes/updateLateFees');
+const reportRoutes = require('./routes/reportRoutes');
 
 // Middleware
 const allowedOrigin = 'http://localhost:3000' // tavo Next dev URL
@@ -54,6 +55,7 @@ app.use(UserRoutes);
 app.use(currencyRoutes);
 app.use(settingsRoutes);
 app.use(notificationsRoutes);
+app.use(reportRoutes);
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")))
 

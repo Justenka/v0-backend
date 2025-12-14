@@ -251,10 +251,10 @@ router.post('/api/debts', async (req, res) => {
   if (!groupId || !title || !amount || !paidByUserId || splits.length === 0) {
     return res.status(400).json({ message: 'Trūksta privalomų laukų' });
   }
-  
+
   // ✅ FIX: Properly parse and validate lateFeePercentage
   let validLateFeePercentage = null;
-  
+
   console.log(`ATEJOOOO ${lateFeePercentage}`);
 
   if (lateFeePercentage !== undefined && lateFeePercentage !== null && lateFeePercentage !== '') {
@@ -476,56 +476,61 @@ router.post('/api/debts', async (req, res) => {
     }
 
     // 3. AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    // 3. CREATE LATE FEE ENTRIES - ONLY IF ENABLED
 
-    const lateFeeStartDate = new Date(termDateStr);
-    lateFeeStartDate.setDate(lateFeeStartDate.getDate() + parseInt(lateFeeAfterDays));
-    const lateFeeStartDateStr = lateFeeStartDate.toISOString().slice(0, 10);
+    if (validLateFeePercentage !== null && validLateFeePercentage > 0) {
+      console.log(`[DELSPINIGIAI] Late fees enabled: ${validLateFeePercentage}% after ${lateFeeAfterDays} days`);
 
-    const [debtParts] = await connection.query(
-      `SELECT id_skolos_dalis 
-      FROM Skolos_dalys 
-      WHERE fk_id_skola = ? AND vaidmuo = 1 AND apmoketa = 0 AND delspinigiai = 1`,
-      [debtId]
-    );
+      const lateFeeStartDate = new Date(termDateStr);
+      lateFeeStartDate.setDate(lateFeeStartDate.getDate() + parseInt(lateFeeAfterDays));
+      const lateFeeStartDateStr = lateFeeStartDate.toISOString().slice(0, 10);
 
-    for (const part of debtParts) {
-
-      const [countSMT] = await connection.query(
-        `SELECT COUNT(apskaiciuota_suma) as cnt
-      FROM delspinigiai 
-      WHERE fk_id_skolos_dalis = ?`,
-        [part.id_skolos_dalis]
+      // Get all unpaid debt parts where delspinigiai should apply
+      const [debtParts] = await connection.query(
+        `SELECT id_skolos_dalis 
+        FROM Skolos_dalys 
+        WHERE fk_id_skola = ? 
+       AND vaidmuo = 1 
+       AND apmoketa = 0 
+       AND delspinigiai = 1`,
+        [debtId]
       );
 
-      console.log(`PASIEKE ${countSMT[0].cnt}`);
-      console.log(`PASIEKE ${parseFloat(lateFeePercentage)}`);
-      console.log(`PASIEKE ${lateFeePercentage}`);
-      console.log(`PASIEKE ${metadata.late_fee_percentage}`);
-      console.log(metadata);
+      console.log(`[DELSPINIGIAI] Found ${debtParts.length} debt parts to apply late fees`);
 
-      if (countSMT[0].cnt == 0) {
-        //const lateFeeStartDate = new Date(today);
-
-
-        await connection.query(
-          `INSERT INTO delspinigiai 
-          (fk_id_skolos_dalis, dienos_proc, pradzios_data, apskaiciuota_suma, aktyvus)
-          VALUES (?, ?, ?, 0.00, 1)`,
-          [
-            part.id_skolos_dalis,
-            lateFeePercentage,
-            lateFeeStartDateStr // When to START calculating (term + lateFeeAfterDays)
-          ]
+      for (const part of debtParts) {
+        // Check if entry already exists (shouldn't happen, but safety check)
+        const [existingEntries] = await connection.query(
+          `SELECT COUNT(*) as cnt
+       FROM delspinigiai 
+       WHERE fk_id_skolos_dalis = ?`,
+          [part.id_skolos_dalis]
         );
-      
-        console.log(`[DELSPINIGIAI] Created active late fee entry for debt part ${part.id_skolos_dalis}`);
-        console.log(`[DELSPINIGIAI] Rate: ${lateFeePercentage}% per day, starts: ${lateFeeStartDateStr}`);
+
+        if (existingEntries[0].cnt === 0) {
+          // Create new late fee entry
+          await connection.query(
+            `INSERT INTO delspinigiai 
+         (fk_id_skolos_dalis, dienos_proc, pradzios_data, apskaiciuota_suma, aktyvus)
+         VALUES (?, ?, ?, 0.00, 1)`,
+            [
+              part.id_skolos_dalis,
+              validLateFeePercentage,
+              lateFeeStartDateStr // When to START calculating (term + lateFeeAfterDays)
+            ]
+          );
+
+          console.log(`[DELSPINIGIAI] Created late fee entry for part ${part.id_skolos_dalis}`);
+          console.log(`[DELSPINIGIAI] Rate: ${validLateFeePercentage}% per day, starts: ${lateFeeStartDateStr}`);
+        } else {
+          console.log(`[DELSPINIGIAI] Late fee entry already exists for part ${part.id_skolos_dalis}, skipping`);
+        }
       }
-
-
+    } else {
+      console.log(`[DELSPINIGIAI] Late fees NOT enabled for this debt - skipping delspinigiai creation`);
     }
 
-
+    // Rest of your code continues here (commit, history entry, etc.)
     await connection.commit();
 
     const historyUserId = actorId ?? Number(paidByUserId);
@@ -739,10 +744,10 @@ router.delete('/api/debts/:debtId', async (req, res) => {
 
     const currencyCode =
       valiutos_kodas === 1 ? 'EUR' :
-      valiutos_kodas === 2 ? 'USD' :
-      valiutos_kodas === 3 ? 'PLN' :
-      valiutos_kodas === 4 ? 'GBP' :
-      valiutos_kodas === 5 ? 'JPY' : 'UNKNOWN';
+        valiutos_kodas === 2 ? 'USD' :
+          valiutos_kodas === 3 ? 'PLN' :
+            valiutos_kodas === 4 ? 'GBP' :
+              valiutos_kodas === 5 ? 'JPY' : 'UNKNOWN';
 
     await addGroupHistoryEntry(
       Number(groupId),
@@ -986,13 +991,12 @@ router.put('/api/debts/:debtId', async (req, res) => {
     const displayTitle = title || oldTitle;
     const descriptionText = changes.length
       ? `Išlaida "${displayTitle}" atnaujinta (${changes
-          .map(
-            (c) =>
-              `${c.label}: ${c.oldValue ?? "nenurodyta"} → ${
-                c.newValue ?? "nenurodyta"
-              }`
-          )
-          .join(", ")}).`
+        .map(
+          (c) =>
+            `${c.label}: ${c.oldValue ?? "nenurodyta"} → ${c.newValue ?? "nenurodyta"
+            }`
+        )
+        .join(", ")}).`
       : `Išlaida "${displayTitle}" atnaujinta.`;
 
     await addGroupHistoryEntry(
@@ -1065,11 +1069,11 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
       );
 
       // Currency mapuojame pagal valiutos_kodas
-      const currency = 
-        debt.valiutos_kodas === 1 ? "EUR" : 
-        debt.valiutos_kodas === 2 ? "USD" : 
-        debt.valiutos_kodas === 3 ? "PLN" : 
-        debt.valiutos_kodas === 4 ? "GBP" : "JPY";
+      const currency =
+        debt.valiutos_kodas === 1 ? "EUR" :
+          debt.valiutos_kodas === 2 ? "USD" :
+            debt.valiutos_kodas === 3 ? "PLN" :
+              debt.valiutos_kodas === 4 ? "GBP" : "JPY";
 
       // SVARBU: Naudojame DABARTINĮ kursą iš valiutos lentelės
       const kursasEurui = parseFloat(debt.currentRate);
@@ -1077,7 +1081,7 @@ router.get('/api/groups/:groupId/balances/:userId', async (req, res) => {
       // Calculate balances
       for (const part of parts) {
         const partUserId = part.userId;
-        
+
         // SUMA YRA EUR - tiesiogiai iš skolos_dalys
         const partAmountEUR = Number(part.amountEUR);
         const amountPaidEUR = Number(part.amountPaidEUR);
@@ -1168,10 +1172,10 @@ router.post('/api/payments', async (req, res) => {
     // NAUJAS KODAS: Gauname valiutos santykį
     let valiutos_kodas = 1;
     let valiutosSantykis = 1.0;
-    
+
     if (currencyCode) {
       const code = currencyCode.trim().toUpperCase();
-      const currencyMap = { 'EUR': 1, 'USD': 2, 'PLN': 3 , 'GBP': 4, 'JPY': 5 };
+      const currencyMap = { 'EUR': 1, 'USD': 2, 'PLN': 3, 'GBP': 4, 'JPY': 5 };
       valiutos_kodas = currencyMap[code] || 1;
 
       // Gauname santykį iš DB
@@ -1180,7 +1184,7 @@ router.post('/api/payments', async (req, res) => {
           `SELECT santykis FROM valiutos WHERE id_valiuta = ? LIMIT 1`,
           [valiutos_kodas]
         );
-        
+
         if (valiutaRows.length > 0) {
           valiutosSantykis = parseFloat(valiutaRows[0].santykis);
           console.log(`Mokėjimo valiutos ${valiutos_kodas} santykis: ${valiutosSantykis}`);
@@ -1193,7 +1197,7 @@ router.post('/api/payments', async (req, res) => {
     // KONVERTUOJAME SUMĄ Į EUR
     const originalAmount = parseFloat(amount);
     const amountInEUR = parseFloat(amount);
-    
+
     console.log(`Mokėjimo originali suma: ${originalAmount} ${currencyCode}`);
     console.log(`Mokėjimo suma eurais: ${amountInEUR}`);
 

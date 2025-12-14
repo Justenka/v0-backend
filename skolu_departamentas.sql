@@ -81,13 +81,12 @@ INSERT INTO `ataskaitos_tipas` (`id_ataskaitos_tipas`, `name`) VALUES
 CREATE TABLE `delspinigiai` (
   `id_delspinigiai` int(11) NOT NULL,
   `fk_id_skolos_dalis` int(11) NOT NULL,
-  `dienos_proc` decimal(5,2) NOT NULL,
+  `dienos_proc` decimal(5,2) DEFAULT NULL,
   `pradzios_data` date NOT NULL,
-  `pabaigos_data` date NOT NULL,
+  `pabaigos_data` date DEFAULT NULL,
   `apskaiciuota_suma` decimal(10,2) NOT NULL,
-  `aktyvus` tinyint(1) NOT NULL
+  `aktyvus` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 -- --------------------------------------------------------
 
 --
