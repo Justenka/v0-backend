@@ -1072,6 +1072,39 @@ router.post("/api/groups/:groupId/invite-friend", async (req, res) => {
       [groupId, toUserId],
     )
 
+    // 3.5) don't send another invite if there's already a pending one for this user in this group
+const [pendingInviteRows] = await conn.query(
+  `SELECT 
+     k.id_kvietimas AS inviteId,
+     k.tokenas      AS token
+   FROM Kvietimai k
+   JOIN Sukuria s         ON s.fk_id_kvietimas = k.id_kvietimas
+   JOIN grupes_nariai gn  ON gn.id_grupes_narys = s.fk_id_grupes_narys
+   JOIN sisteminiai_pranesimai sp ON sp.fk_id_vartotojas = ?
+   WHERE gn.fk_id_grupe = ?
+     AND k.kvietimo_busena = 1
+     AND sp.metadata IS NOT NULL
+     AND JSON_UNQUOTE(JSON_EXTRACT(sp.metadata, '$.type')) = 'group_invite'
+     AND JSON_UNQUOTE(JSON_EXTRACT(sp.metadata, '$.groupId')) = ?
+     AND JSON_UNQUOTE(JSON_EXTRACT(sp.metadata, '$.inviteId')) = CAST(k.id_kvietimas AS CHAR)
+   ORDER BY k.id_kvietimas DESC
+   LIMIT 1`,
+  [toUserId, groupId, String(groupId)]
+)
+
+if (pendingInviteRows.length > 0) {
+  const existing = pendingInviteRows[0]
+  const actionUrl = `/groups/${groupId}/join?token=${encodeURIComponent(existing.token)}`
+  await conn.rollback()
+  return res.status(200).json({
+    ok: true,
+    alreadyInvited: true,
+    inviteId: existing.inviteId,
+    token: existing.token,
+    actionUrl,
+  })
+}
+
     if (alreadyMember.length > 0) {
       await conn.rollback()
       return res.status(409).json({ message: "Vartotojas jau yra grupėje" })
@@ -1188,7 +1221,7 @@ router.post("/api/groups/invites/:inviteId/accept", async (req, res) => {
     // 3) add user to group
     await conn.query(
       `INSERT INTO grupes_nariai (fk_id_grupe, fk_id_vartotojas, role, nario_busena)
-       VALUES (?, ?, 1, 1)`,
+       VALUES (?, ?, 2, 1)`,
       [groupId, userId]
     )
 
