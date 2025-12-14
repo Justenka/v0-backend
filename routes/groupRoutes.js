@@ -796,27 +796,87 @@ router.get('/api/debt-parts/:debtId', async (req, res) => {
 
 // DELETE /api/groups/:groupId/members/:memberId – pašalinti narį
 router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
-  const { groupId, memberId } = req.params
+  const groupId = Number(req.params.groupId)
+  const memberId = Number(req.params.memberId)
   const actorId = Number(req.header("x-user-id")) || null
 
+  if (!actorId) return res.status(401).json({ message: "Trūksta x-user-id" })
+  if (!groupId || !memberId) return res.status(400).json({ message: "Blogi parametrai" })
+
   try {
-    // Pasiimam info apie pašalinamą narį
+    // 1) actor turi būti aktyvus narys ir admin
+    const [actorRows] = await db.query(
+      `SELECT role
+       FROM grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+       LIMIT 1`,
+      [groupId, actorId]
+    )
+
+    if (!actorRows.length) return res.status(403).json({ message: "Nesate grupės narys" })
+    if (Number(actorRows[0].role) !== 3) return res.status(403).json({ message: "Tik administratorius gali šalinti narius" })
+
+    // 2) target turi būti aktyvus narys
+    const [targetRows] = await db.query(
+      `SELECT role
+       FROM grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+       LIMIT 1`,
+      [groupId, memberId]
+    )
+    if (!targetRows.length) return res.status(404).json({ message: "Narys nerastas" })
+
+    // 3) (OPTIONAL, bet rekomenduoju) neleisti išmesti grupės owner (fk_id_vartotojas)
+    const [ownerRows] = await db.query(
+      `SELECT fk_id_vartotojas AS ownerId
+       FROM grupes
+       WHERE id_grupe = ?
+       LIMIT 1`,
+      [groupId]
+    )
+    const ownerId = Number(ownerRows?.[0]?.ownerId || 0)
+    if (ownerId === memberId) {
+      return res.status(400).json({ message: "Negalite pašalinti grupės savininko. Pirma perduokite admin teises/owner kitam nariui." })
+    }
+
+    // 4) (OPTIONAL) neleisti pašalinti paskutinio admin
+    if (Number(targetRows[0].role) === 3) {
+      const [adminCntRows] = await db.query(
+        `SELECT COUNT(*) AS cnt
+         FROM grupes_nariai
+         WHERE fk_id_grupe = ? AND role = 3 AND nario_busena = 1`,
+        [groupId]
+      )
+      const adminCount = Number(adminCntRows?.[0]?.cnt || 0)
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: "Negalima pašalinti paskutinio administratoriaus." })
+      }
+    }
+
+    // 5) PAGRINDINĖ TAISYKLĖ: negalima pašalinti, jei yra neatsiskaitytų skolų
+    const hasUnsettled = await hasUnsettledDebts(groupId, memberId)
+    if (hasUnsettled) {
+      return res.status(400).json({
+        message: "Negalima pašalinti nario, kol jis nėra pilnai atsiskaitęs (turi neapmokėtų skolų grupėje).",
+      })
+    }
+
+    // 6) pasiimam info istorijai
     const [userRows] = await db.query(
       `SELECT vardas, pavarde, el_pastas 
        FROM Vartotojai 
        WHERE id_vartotojas = ?`,
       [memberId]
     )
-
     const member = userRows[0] || null
-    const memberName = member
-      ? `${member.vardas} ${member.pavarde || ""}`.trim()
-      : `ID ${memberId}`
-    const memberEmail = member ? member.el_pastas : null
+    const memberName = member ? `${member.vardas} ${member.pavarde || ""}`.trim() : `ID ${memberId}`
+    const memberEmail = member?.el_pastas || null
 
-    // Pažymim kaip neaktyvų
+    // 7) pažymim kaip neaktyvų
     const [result] = await db.query(
-      "UPDATE Grupes_nariai SET nario_busena = 3 WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?",
+      `UPDATE grupes_nariai
+       SET nario_busena = 3
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1`,
       [groupId, memberId]
     )
 
@@ -824,26 +884,21 @@ router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
       return res.status(404).json({ message: "Narys nerastas" })
     }
 
-    // Istorija – kas ką pašalino
     await addGroupHistoryEntry(
-      Number(groupId),
-      actorId, // tas, kas daro veiksmą
+      groupId,
+      actorId,
       "member_removed",
       `Pašalintas narys "${memberName}".`,
-      {
-        memberId: Number(memberId),
-        memberName,
-        memberEmail,
-      }
+      { memberId, memberName, memberEmail }
     )
 
-    res.json({ success: true })
+    return res.json({ ok: true })
   } catch (err) {
     console.error("Remove member error:", err)
-    const message = err.sqlMessage || err.message || "Serverio klaida"
-    res.status(500).json({ message })
+    return res.status(500).json({ message: err.sqlMessage || err.message || "Serverio klaida" })
   }
 })
+
 
 async function computeUserNetBalanceEUR(groupId, userId) {
   const [rows] = await db.query(
@@ -1543,5 +1598,27 @@ router.get("/api/groups/:groupId/history", async (req, res) => {
     res.status(500).json({ message: "Nepavyko gauti grupės istorijos" })
   }
 })
+
+async function hasUnsettledDebts(groupId, userId) {
+  const [rows] = await db.query(
+    `
+    SELECT COUNT(*) AS cnt
+    FROM Skolos s
+    JOIN Skolos_dalys sd ON sd.fk_id_skola = s.id_skola
+    WHERE s.fk_id_grupe = ?
+      AND s.skolos_statusas = 1
+      AND (sd.suma - sd.sumoketa) > 0
+      AND (
+        -- user skolingas (jis yra skolos dalyje)
+        sd.fk_id_vartotojas = ?
+        -- ARBA kiti skolingi jam (jis yra skolos kūrėjas/mokėtojas)
+        OR s.fk_id_vartotojas = ?
+      )
+    `,
+    [groupId, userId, userId]
+  )
+
+  return Number(rows?.[0]?.cnt || 0) > 0
+}
 
 module.exports = router;
