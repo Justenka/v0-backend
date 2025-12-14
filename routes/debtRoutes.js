@@ -804,6 +804,43 @@ router.delete('/api/debts/:debtId', async (req, res) => {
 
 //-----------------------------------------------------------------------------------------------------------------------------------
 
+router.get('/api/debts/check-duplicate', async (req, res) => {
+  const { groupId, title, excludeDebtId } = req.query;
+
+  if (!groupId || !title) {
+    return res.status(400).json({ message: 'Trūksta reikalingų parametrų' });
+  }
+
+  try {
+    let query = `
+      SELECT id_skola AS debtId
+      FROM Skolos 
+      WHERE fk_id_grupe = ? 
+      AND LOWER(TRIM(pavadinimas)) = LOWER(TRIM(?))
+    `;
+
+    const params = [groupId, title];
+
+    // Exclude current debt when editing
+    if (excludeDebtId) {
+      query += ` AND id_skola != ?`;
+      params.push(excludeDebtId);
+    }
+
+    query += ` LIMIT 1`;
+
+    const [rows] = await db.query(query, params);
+
+    res.json({
+      exists: rows.length > 0,
+      debtId: rows.length > 0 ? rows[0].debtId : null
+    });
+  } catch (err) {
+    console.error('Duplicate check error:', err);
+    res.status(500).json({ message: 'Serverio klaida' });
+  }
+});
+
 // ------------------------------------------
 // GET specific debt with all parts/splits
 // ------------------------------------------
@@ -1425,40 +1462,6 @@ router.get('/api/groups/:groupId/simplify-debts', async (req, res) => {
   }
 });
 
-router.get('/api/debts/check-duplicate', async (req, res) => {
-  const { groupId, title, excludeDebtId } = req.query;
 
-  if (!groupId || !title) {
-    return res.status(400).json({ message: 'Trūksta reikalingų parametrų' });
-  }
 
-  try {
-    let query = `
-      SELECT id_skola AS debtId
-      FROM Skolos 
-      WHERE fk_id_grupe = ? 
-      AND LOWER(TRIM(pavadinimas)) = LOWER(TRIM(?))
-    `;
-
-    const params = [groupId, title];
-
-    // Exclude current debt when editing
-    if (excludeDebtId) {
-      query += ` AND id_skola != ?`;
-      params.push(excludeDebtId);
-    }
-
-    query += ` LIMIT 1`;
-
-    const [rows] = await db.query(query, params);
-
-    res.json({
-      exists: rows.length > 0,
-      debtId: rows.length > 0 ? rows[0].debtId : null
-    });
-  } catch (err) {
-    console.error('Duplicate check error:', err);
-    res.status(500).json({ message: 'Serverio klaida' });
-  }
-});
 module.exports = router;

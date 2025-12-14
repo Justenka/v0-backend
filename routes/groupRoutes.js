@@ -845,6 +845,116 @@ router.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
   }
 })
 
+async function computeUserNetBalanceEUR(groupId, userId) {
+  const [rows] = await db.query(
+    `
+    SELECT 
+      COALESCE(SUM(
+        CASE
+          -- kiti skolingi man (aš mokėtojas)
+          WHEN s.fk_id_vartotojas = ? 
+            AND sd.vaidmuo = 1
+            AND sd.fk_id_vartotojas <> ?
+            AND (sd.suma - sd.sumoketa) > 0
+          THEN (sd.suma - sd.sumoketa)
+
+          -- aš skolingas kitiems (aš skolininkas)
+          WHEN sd.fk_id_vartotojas = ?
+            AND sd.vaidmuo = 1
+            AND s.fk_id_vartotojas <> ?
+            AND (sd.suma - sd.sumoketa) > 0
+          THEN -(sd.suma - sd.sumoketa)
+
+          ELSE 0
+        END
+      ), 0) AS netEUR
+    FROM Skolos s
+    JOIN Skolos_dalys sd ON sd.fk_id_skola = s.id_skola
+    WHERE s.fk_id_grupe = ?
+      AND s.skolos_statusas = 1
+    `,
+    [userId, userId, userId, userId, groupId]
+  )
+
+  // DEBUG
+  console.log("[LEAVE][BALANCE] raw rows:", rows)
+
+  const netEUR = Number(rows?.[0]?.netEUR ?? 0)
+
+  // DEBUG
+  console.log(`[LEAVE][BALANCE] groupId=${groupId} userId=${userId} netEUR=${netEUR}`)
+
+  return netEUR
+}
+
+router.post("/api/groups/:groupId/leave", async (req, res) => {
+  const groupId = Number(req.params.groupId)
+  const actorId = Number(req.header("x-user-id"))
+
+  if (!actorId) return res.status(401).json({ message: "Trūksta x-user-id" })
+  if (!groupId) return res.status(400).json({ message: "Blogas groupId" })
+
+  try {
+    // 1) turi būti grupės narys
+    const [meRows] = await db.query(
+      `SELECT role 
+       FROM grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1
+       LIMIT 1`,
+      [groupId, actorId]
+    )
+    if (!meRows.length) return res.status(403).json({ message: "Nesate grupės narys" })
+
+    // 2) NEGALIMA išeiti, jei balansas ne 0
+    const netEUR = await computeUserNetBalanceEUR(groupId, actorId)
+    if (Math.abs(netEUR) > 0.01) {
+      return res.status(400).json({
+        message: "Negalite palikti grupės, kol neatsiskaitėte (balansas turi būti 0).",
+        netBalanceEUR: Number(netEUR.toFixed(2)),
+      })
+    }
+
+    // 3) papildoma taisyklė: jei esi vienintelis adminas – neleisti išeiti
+    const ROLE_ADMIN = 3
+    if (Number(meRows[0].role) === ROLE_ADMIN) {
+      const [adminCntRows] = await db.query(
+        `SELECT COUNT(*) AS cnt
+         FROM grupes_nariai
+         WHERE fk_id_grupe = ? AND role = ? AND nario_busena = 1`,
+        [groupId, ROLE_ADMIN]
+      )
+      const adminCount = Number(adminCntRows?.[0]?.cnt || 0)
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          message: "Negalite palikti grupės, nes esate vienintelis administratorius. Pirma perduokite admin teises kitam nariui."
+        })
+      }
+    }
+
+    // 4) pažymim kaip išėjęs
+    await db.query(
+      `UPDATE grupes_nariai
+       SET nario_busena = 3
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = 1`,
+      [groupId, actorId]
+    )
+
+    // (optional) istorija
+    await addGroupHistoryEntry(
+      groupId,
+      actorId,
+      "member_left",
+      `Narys paliko grupę.`,
+      { userId: actorId }
+    )
+
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error("Leave group error:", err)
+    return res.status(500).json({ message: "Serverio klaida" })
+  }
+})
+
 // DELETE /api/groups/:groupId – ištrinti grupę ir susijusius duomenis
 router.delete("/api/groups/:groupId", async (req, res) => {
   const groupId = Number(req.params.groupId)
