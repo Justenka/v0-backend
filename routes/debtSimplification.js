@@ -1,11 +1,10 @@
-// utils/debtSimplification.js
+// debtSimplification.js - COMPLETELY REWRITTEN
 const db = require('../db');
 
 /**
- * Automatiškai išlygina skolas grupėje
- * Ištrina senas skolas ir sukuria naujas optimizuotas
- * @param {number} groupId - Grupės ID
- * @returns {Promise<Object>} - Išlyginimo rezultatas
+ * Automatically simplify debts by creating payment records
+ * Instead of creating new "Išlyginta skola" entries, we create Mokejimai records
+ * This keeps all original transactions visible and marks them as paid
  */
 async function autoSimplifyGroupDebts(groupId, connection = null) {
   const shouldCloseConnection = !connection;
@@ -16,15 +15,17 @@ async function autoSimplifyGroupDebts(groupId, connection = null) {
       await conn.beginTransaction();
     }
 
-    console.log(`[IŠLYGINIMAS] Pradedamas grupės ${groupId} skolų išlyginimas...`);
+    console.log(`[IŠLYGINIMAS] Starting debt simplification for group ${groupId}...`);
 
-    // 1. Gauname visas aktyvias skolų dalis (TIK SKOLININKUS - vaidmuo = 1)
+    // 1. Get all active debt parts (only debtors - vaidmuo = 1)
     const [debtParts] = await conn.query(
       `SELECT 
          s.id_skola,
          s.fk_id_vartotojas AS payer_id,
+         sd.id_skolos_dalis,
          sd.fk_id_vartotojas AS debtor_id,
-         sd.suma,
+         sd.suma AS debt_amount,
+         sd.sumoketa AS amount_paid,
          sd.vaidmuo
        FROM Skolos s
        JOIN Skolos_dalys sd ON s.id_skola = sd.fk_id_skola
@@ -32,12 +33,12 @@ async function autoSimplifyGroupDebts(groupId, connection = null) {
          AND s.skolos_statusas = 1
          AND sd.apmoketa = 0
          AND sd.vaidmuo = 1
-       ORDER BY s.id_skola`,
+       ORDER BY s.sukurimo_data ASC`,
       [groupId]
     );
 
     if (debtParts.length === 0) {
-      console.log('[IŠLYGINIMAS] Nėra aktyvių skolų (vaidmuo=1)');
+      console.log('[IŠLYGINIMAS] No active debts found');
       if (shouldCloseConnection) await conn.commit();
       return { 
         message: 'Nėra aktyvių skolų',
@@ -45,248 +46,185 @@ async function autoSimplifyGroupDebts(groupId, connection = null) {
       };
     }
 
-    console.log('[IŠLYGINIMAS] Rastos skolų dalys:', debtParts.length);
+    console.log(`[IŠLYGINIMAS] Found ${debtParts.length} active debt parts`);
 
-    // 2. Skaičiuojame NET balansus (kas kam kiek skolingas)
-    // balances[userId] = kiek jis BENDRAI skolingas/skolinamas
-    const netDebts = {}; // { fromUserId: { toUserId: amount } }
+    // 2. Calculate NET balances between each pair of users
+    // netDebts[debtorId][creditorId] = amount debtor owes to creditor
+    const netDebts = {};
 
     for (const part of debtParts) {
-      const payerId = part.payer_id;      // Kas mokėjo (kam skolingi)
-      const debtorId = part.debtor_id;    // Kas skolingas
-      const amount = parseFloat(part.suma);
+      const payerId = part.payer_id;      // Who paid (creditor)
+      const debtorId = part.debtor_id;    // Who owes (debtor)
+      const debtAmount = parseFloat(part.debt_amount);
+      const alreadyPaid = parseFloat(part.amount_paid);
+      const remaining = debtAmount - alreadyPaid;
 
-      // Inicializuojame
+      if (remaining <= 0.01) continue; // Skip if fully paid
+
+      // Initialize structures
       if (!netDebts[debtorId]) netDebts[debtorId] = {};
       if (!netDebts[payerId]) netDebts[payerId] = {};
       
-      // Skolininkas (debtorId) skolingas mokėtojui (payerId)
+      // Add this debt
       if (!netDebts[debtorId][payerId]) {
-        netDebts[debtorId][payerId] = 0;
+        netDebts[debtorId][payerId] = [];
       }
-      netDebts[debtorId][payerId] += amount;
-
-      // Atvirkščiai - jei mokėtojas (payerId) skolingas skolininkui (debtorId)
-      // Tai išlyginame
-      if (netDebts[payerId] && netDebts[payerId][debtorId]) {
-        const reverseAmount = netDebts[payerId][debtorId];
-        const minAmount = Math.min(amount, reverseAmount);
-        
-        // Išlyginame abipuses skolas
-        netDebts[debtorId][payerId] -= minAmount;
-        netDebts[payerId][debtorId] -= minAmount;
-        
-        // Pašaliname jei suma 0
-        if (Math.abs(netDebts[debtorId][payerId]) < 0.01) {
-          delete netDebts[debtorId][payerId];
-        }
-        if (Math.abs(netDebts[payerId][debtorId]) < 0.01) {
-          delete netDebts[payerId][debtorId];
-        }
-      }
+      netDebts[debtorId][payerId].push({
+        partId: part.id_skolos_dalis,
+        debtId: part.id_skola,
+        amount: remaining
+      });
     }
 
-    console.log('[IŠLYGINIMAS] NET skolos:', JSON.stringify(netDebts, null, 2));
+    console.log('[IŠLYGINIMAS] Net debts calculated');
 
-    // 3. Konvertuojame į paprastą formatą ir skaičiuojame balansus
-    const balances = {};
-    const directDebts = [];
-
-    for (const [debtorId, debtorDebts] of Object.entries(netDebts)) {
-      for (const [creditorId, amount] of Object.entries(debtorDebts)) {
-        if (amount > 0.01) {
-          directDebts.push({
-            from: parseInt(debtorId),
-            to: parseInt(creditorId),
-            amount: Math.round(amount * 100) / 100
-          });
-
-          // Skaičiuojame balansus
-          if (!balances[debtorId]) balances[debtorId] = 0;
-          if (!balances[creditorId]) balances[creditorId] = 0;
-          
-          balances[debtorId] -= amount;   // Jis skolingas (neigiamas)
-          balances[creditorId] += amount;  // Jam skolingi (teigiamas)
-        }
-      }
-    }
-
-    console.log('[IŠLYGINIMAS] Tiesiogines skolos:', directDebts);
-    console.log('[IŠLYGINIMAS] Balansai:', balances);
-
-    if (directDebts.length === 0) {
-      console.log('[IŠLYGINIMAS] Visos skolos jau išlygintos');
-      if (shouldCloseConnection) await conn.commit();
-      return { 
-        message: 'Visos skolos jau išlygintos',
-        simplified: false
-      };
-    }
-
-    // 4. Optimizuojame skolas (jei yra daugiau nei 2 žmonės)
-    const uniqueUsers = new Set([
-      ...directDebts.map(d => d.from),
-      ...directDebts.map(d => d.to)
-    ]);
-
-    let simplifiedDebts = directDebts;
-
-    // Tik jei yra daugiau nei 2 žmonės, bandome optimizuoti per balansus
-    if (uniqueUsers.size > 2) {
-      console.log('[IŠLYGINIMAS] Optimizuojame per balansus...');
-      
-      const debtors = [];
-      const creditors = [];
-
-      for (const [userId, balance] of Object.entries(balances)) {
-        const roundedBalance = Math.round(balance * 100) / 100;
-        
-        if (roundedBalance < -0.01) {
-          debtors.push({ 
-            userId: parseInt(userId), 
-            amount: Math.abs(roundedBalance) 
-          });
-        } else if (roundedBalance > 0.01) {
-          creditors.push({ 
-            userId: parseInt(userId), 
-            amount: roundedBalance 
-          });
-        }
-      }
-
-      if (debtors.length > 0 && creditors.length > 0) {
-        simplifiedDebts = [];
-        
-        debtors.sort((a, b) => b.amount - a.amount);
-        creditors.sort((a, b) => b.amount - a.amount);
-
-        let i = 0;
-        let j = 0;
-
-        while (i < debtors.length && j < creditors.length) {
-          const debtor = debtors[i];
-          const creditor = creditors[j];
-
-          const transferAmount = Math.min(debtor.amount, creditor.amount);
-
-          if (transferAmount > 0.01) {
-            simplifiedDebts.push({
-              from: debtor.userId,
-              to: creditor.userId,
-              amount: Math.round(transferAmount * 100) / 100
-            });
-          }
-
-          debtor.amount -= transferAmount;
-          creditor.amount -= transferAmount;
-
-          if (debtor.amount < 0.01) i++;
-          if (creditor.amount < 0.01) j++;
-        }
-      }
-    }
-
-    console.log('[IŠLYGINIMAS] Optimizuotos skolos:', simplifiedDebts);
-
-    // Jei po optimizavimo skolų skaičius toks pat arba didesnis - naudojame originalias
-    if (simplifiedDebts.length >= directDebts.length) {
-      console.log('[IŠLYGINIMAS] Optimizavimas nesuteikė pranašumo, naudojame tiesiogines skolas');
-      simplifiedDebts = directDebts;
-    }
-
-    const originalCount = debtParts.length;
-    const simplifiedCount = simplifiedDebts.length;
-
-    // Jei nieko nesutaupome - nereiškia išlyginti
-    if (simplifiedCount >= originalCount) {
-      console.log('[IŠLYGINIMAS] Nieko nesutaupyta, praleidžiame išlyginimą');
-      if (shouldCloseConnection) await conn.commit();
-      return {
-        message: 'Išlyginimas nesuteikė pranašumo',
-        simplified: false,
-        originalCount,
-        simplifiedCount
-      };
-    }
-
-    // 5. Pažymime senas skolas kaip "išlygintas" (statusas = 2)
-    await conn.query(
-      `UPDATE Skolos 
-       SET skolos_statusas = 2, 
-           paskutinio_keitimo_data = CURDATE()
-       WHERE fk_id_grupe = ? 
-         AND skolos_statusas = 1`,
-      [groupId]
-    );
-
-    // 6. Sukuriame naujas optimizuotas skolas
+    // 3. Find mutual debts and create offsetting payments
+    const paymentsCreated = [];
     const today = new Date().toISOString().slice(0, 10);
-    const termDate = new Date();
-    termDate.setDate(termDate.getDate() + 30);
-    const termDateStr = termDate.toISOString().slice(0, 10);
 
-    for (const debt of simplifiedDebts) {
-      // Sukuriame naują skolą
-      const [debtResult] = await conn.query(
-        `INSERT INTO Skolos 
-          (fk_id_grupe, fk_id_vartotojas, pavadinimas, aprasymas, suma, kursas_eurui,
-           sukurimo_data, paskutinio_keitimo_data, terminas, valiutos_kodas,
-           skolos_statusas, kategorija)
-         VALUES (?, ?, ?, ?, ?, 1.0000, ?, ?, ?, 1, 1, 11)`,
-        [
-          groupId,
-          debt.to,  // Mokėtojas (kam skolingi)
-          'Išlyginta skola',
-          'Automatiškai išlyginta skola',
-          debt.amount,
-          today,
-          today,
-          termDateStr,
-        ]
-      );
+    for (const [debtorId, creditors] of Object.entries(netDebts)) {
+      for (const [creditorId, debts] of Object.entries(creditors)) {
+        // Check if there's a reverse debt (creditor owes debtor)
+        const reverseDebts = netDebts[creditorId]?.[debtorId];
+        
+        if (!reverseDebts || reverseDebts.length === 0) continue;
 
-      const newDebtId = debtResult.insertId;
+        // Calculate total amounts
+        const debtorOwesAmount = debts.reduce((sum, d) => sum + d.amount, 0);
+        const creditorOwesAmount = reverseDebts.reduce((sum, d) => sum + d.amount, 0);
+        
+        // Find the smaller amount to offset
+        const offsetAmount = Math.min(debtorOwesAmount, creditorOwesAmount);
+        
+        if (offsetAmount < 0.01) continue;
 
-      // Sukuriame skolos dalis
-      // Skolininkas (from) - vaidmuo 1
-      await conn.query(
-        `INSERT INTO Skolos_dalys 
-          (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, delspinigiai, vaidmuo)
-         VALUES (?, ?, ?, 100.00, 0, 0, 1)`,
-        [newDebtId, debt.from, debt.amount]
-      );
+        console.log(`[IŠLYGINIMAS] Found mutual debt: User ${debtorId} ↔ User ${creditorId} = ${offsetAmount} EUR`);
 
-      // Mokėtojas (to) - vaidmuo 2
-      await conn.query(
-        `INSERT INTO Skolos_dalys 
-          (fk_id_skola, fk_id_vartotojas, suma, procentas, apmoketa, delspinigiai, vaidmuo)
-         VALUES (?, ?, ?, 0, 1, 0, 2)`,
-        [newDebtId, debt.to, debt.amount]
-      );
+        // 4. Create payment records to offset these debts
+        let remainingOffset = offsetAmount;
+
+        // Pay off debtor's debts first
+        for (const debt of debts) {
+          if (remainingOffset <= 0.01) break;
+
+          const paymentAmount = Math.min(remainingOffset, debt.amount);
+
+          // Create payment record
+          const [paymentResult] = await conn.query(
+            `INSERT INTO Mokejimai 
+              (fk_id_skolos_dalis, fk_id_vartotojas, data, suma, kursas_eurui)
+             VALUES (?, ?, ?, ?, 1.0000)`,
+            [debt.partId, debtorId, today, paymentAmount]
+          );
+
+          // Update debt part
+          const [currentPart] = await conn.query(
+            `SELECT suma, sumoketa FROM Skolos_dalys WHERE id_skolos_dalis = ?`,
+            [debt.partId]
+          );
+
+          const newPaidAmount = parseFloat(currentPart[0].sumoketa) + paymentAmount;
+          const totalDebt = parseFloat(currentPart[0].suma);
+
+          await conn.query(
+            `UPDATE Skolos_dalys 
+             SET sumoketa = ?,
+                 apmoketa = ?
+             WHERE id_skolos_dalis = ?`,
+            [newPaidAmount, newPaidAmount >= totalDebt - 0.01 ? 1 : 0, debt.partId]
+          );
+
+          remainingOffset -= paymentAmount;
+          
+          paymentsCreated.push({
+            from: debtorId,
+            to: creditorId,
+            amount: paymentAmount,
+            debtPartId: debt.partId
+          });
+
+          console.log(`[IŠLYGINIMAS] Created payment: ${debtorId} → ${creditorId} = ${paymentAmount} EUR`);
+        }
+
+        // Pay off reverse debts
+        remainingOffset = offsetAmount;
+        for (const reverseDebt of reverseDebts) {
+          if (remainingOffset <= 0.01) break;
+
+          const paymentAmount = Math.min(remainingOffset, reverseDebt.amount);
+
+          // Create payment record
+          await conn.query(
+            `INSERT INTO Mokejimai 
+              (fk_id_skolos_dalis, fk_id_vartotojas, data, suma, kursas_eurui)
+             VALUES (?, ?, ?, ?, 1.0000)`,
+            [reverseDebt.partId, creditorId, today, paymentAmount]
+          );
+
+          // Update debt part
+          const [currentPart] = await conn.query(
+            `SELECT suma, sumoketa FROM Skolos_dalys WHERE id_skolos_dalis = ?`,
+            [reverseDebt.partId]
+          );
+
+          const newPaidAmount = parseFloat(currentPart[0].sumoketa) + paymentAmount;
+          const totalDebt = parseFloat(currentPart[0].suma);
+
+          await conn.query(
+            `UPDATE Skolos_dalys 
+             SET sumoketa = ?,
+                 apmoketa = ?
+             WHERE id_skolos_dalis = ?`,
+            [newPaidAmount, newPaidAmount >= totalDebt - 0.01 ? 1 : 0, reverseDebt.partId]
+          );
+
+          remainingOffset -= paymentAmount;
+
+          paymentsCreated.push({
+            from: creditorId,
+            to: debtorId,
+            amount: paymentAmount,
+            debtPartId: reverseDebt.partId
+          });
+
+          console.log(`[IŠLYGINIMAS] Created payment: ${creditorId} → ${debtorId} = ${paymentAmount} EUR`);
+        }
+
+        // Clear these debts from our tracking since we've processed them
+        delete netDebts[debtorId][creditorId];
+        if (netDebts[creditorId]) {
+          delete netDebts[creditorId][debtorId];
+        }
+      }
     }
-
-    const saved = originalCount - simplifiedCount;
-
-    console.log(`[IŠLYGINIMAS] Sėkmingai išlyginta: ${originalCount} → ${simplifiedCount} (sutaupyta: ${saved})`);
 
     if (shouldCloseConnection) {
       await conn.commit();
     }
 
+    if (paymentsCreated.length === 0) {
+      console.log('[IŠLYGINIMAS] No mutual debts found to simplify');
+      return {
+        message: 'Nerasta tarpusavio skolų išlyginimui',
+        simplified: false
+      };
+    }
+
+    console.log(`[IŠLYGINIMAS] Successfully created ${paymentsCreated.length} offsetting payments`);
+
     return {
       message: 'Skolos sėkmingai išlygintos',
       simplified: true,
-      originalCount,
-      simplifiedCount,
-      savedTransactions: Math.max(0, saved),
-      newDebts: simplifiedDebts
+      paymentsCreated: paymentsCreated.length,
+      totalAmountOffset: paymentsCreated.reduce((sum, p) => sum + p.amount, 0),
+      details: paymentsCreated
     };
 
   } catch (error) {
     if (shouldCloseConnection) {
       await conn.rollback();
     }
-    console.error('[IŠLYGINIMAS] Klaida:', error);
+    console.error('[IŠLYGINIMAS] Error:', error);
     throw error;
   } finally {
     if (shouldCloseConnection) {
@@ -296,12 +234,10 @@ async function autoSimplifyGroupDebts(groupId, connection = null) {
 }
 
 /**
- * PAPILDOMA FUNKCIJA: Gauti dabartines išlygintas skolas su vardais
- * (naudojama tik peržiūrai/debuginimui)
+ * Get current debts for a group (for debugging/display)
  */
 async function getSimplifiedDebtsWithNames(groupId) {
   try {
-    // Gauname visas aktyvias skolas
     const [debts] = await db.query(
       `SELECT 
          s.id_skola,
@@ -311,6 +247,8 @@ async function getSimplifiedDebtsWithNames(groupId) {
          payer.pavarde AS payer_surname,
          debtor.vardas AS debtor_name,
          debtor.pavarde AS debtor_surname,
+         sd.suma AS debt_amount,
+         sd.sumoketa AS paid_amount,
          sd.vaidmuo
        FROM Skolos s
        JOIN Vartotojai payer ON s.fk_id_vartotojas = payer.id_vartotojas
@@ -327,7 +265,9 @@ async function getSimplifiedDebtsWithNames(groupId) {
     const result = debts.map(d => ({
       debtId: d.id_skola,
       title: d.pavadinimas,
-      amount: parseFloat(d.suma),
+      amount: parseFloat(d.debt_amount),
+      paid: parseFloat(d.paid_amount),
+      remaining: parseFloat(d.debt_amount) - parseFloat(d.paid_amount),
       from: `${d.debtor_name} ${d.debtor_surname}`,
       to: `${d.payer_name} ${d.payer_surname}`
     }));
@@ -338,7 +278,7 @@ async function getSimplifiedDebtsWithNames(groupId) {
       count: result.length
     };
   } catch (error) {
-    console.error('Klaida gaunant skolas:', error);
+    console.error('Error getting debts:', error);
     throw error;
   }
 }

@@ -1,165 +1,155 @@
-// cron/updateLateFees.js
+// cron/updateLateFees.js - PURE JAVASCRIPT VERSION
 const cron = require('node-cron');
 const db = require('../db');
 
 /**
  * Calculate and update late fees daily
- * Works with existing database structure
- * Stores percentage in aprasymas field as JSON metadata
- * Runs every day at 00:01
+ * This version correctly:
+ * 1. Calculates daily late fees
+ * 2. Updates apskaiciuota_suma in delspinigiai table
+ * 3. Adds accumulated late fees to the debt amount in Skolos_dalys
  */
 const updateLateFees = async () => {
-  console.log(`[${new Date().toISOString()}] Starting daily late fee update...`);
+  console.log('[' + new Date().toISOString() + '] Starting daily late fee update...');
   
   const connection = await db.getConnection();
   
   try {
     await connection.beginTransaction();
     
-    // Get all active debts with late fees enabled
-    const [debts] = await connection.query(`
-      SELECT 
+    // Get all active late fee entries that should be calculated
+    const [lateFeeEntries] = await connection.query(
+      `SELECT 
+        d.id_delspinigiai,
+        d.fk_id_skolos_dalis,
+        d.dienos_proc AS daily_percentage,
+        d.pradzios_data AS start_date,
+        d.apskaiciuota_suma AS accumulated_fee,
+        d.aktyvus,
+        sd.suma AS original_debt,
+        sd.sumoketa AS amount_paid,
+        sd.apmoketa AS is_fully_paid,
         s.id_skola,
-        s.aprasymas,
-        s.suma AS total_amount,
-        s.kursas_eurui,
-        s.valiutos_kodas,
-        s.terminas,
-        s.sukurimo_data
-      FROM Skolos s
-      WHERE s.skolos_statusas = 1
-        AND s.aprasymas IS NOT NULL
-        AND s.aprasymas LIKE '%"lateFeePercentage":%'
-    `);
+        s.pavadinimas AS debt_title
+      FROM delspinigiai d
+      JOIN Skolos_dalys sd ON d.fk_id_skolos_dalis = sd.id_skolos_dalis
+      JOIN Skolos s ON sd.fk_id_skola = s.id_skola
+      WHERE d.aktyvus = 1
+        AND sd.apmoketa = 0
+        AND s.skolos_statusas = 1
+        AND d.pradzios_data <= CURDATE()`
+    );
     
-    console.log(`Found ${debts.length} debts with late fees enabled`);
+    console.log('[LATE FEES] Found ' + lateFeeEntries.length + ' active late fee entries');
     
-    for (const debt of debts) {
-      try {
-        // Parse metadata from aprasymas field
-        const metadata = JSON.parse(debt.aprasymas);
-        const lateFeePercentage = parseFloat(metadata.lateFeePercentage);
-        const lateFeeAfterDays = parseInt(metadata.lateFeeAfterDays || 7);
-        
-        if (!lateFeePercentage || lateFeePercentage <= 0) continue;
-        
-        // Calculate when late fees should start
-        const termDate = new Date(debt.terminas);
-        const lateFeeStartDate = new Date(termDate);
-        lateFeeStartDate.setDate(lateFeeStartDate.getDate() + lateFeeAfterDays);
-        
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Skip if late fee period hasn't started yet
-        if (today < lateFeeStartDate) continue;
-        
-        // Get all unpaid debt parts for this debt
-        const [parts] = await connection.query(`
-          SELECT 
-            sd.id_skolos_dalis,
-            sd.fk_id_vartotojas,
-            sd.suma AS debt_amount,
-            sd.sumoketa AS amount_paid,
-            sd.apmoketa AS is_paid,
-            sd.vaidmuo
-          FROM Skolos_dalys sd
-          WHERE sd.fk_id_skola = ?
-            AND sd.vaidmuo = 1
-            AND sd.apmoketa = 0
-        `, [debt.id_skola]);
-        
-        for (const part of parts) {
-          // All amounts are already in EUR in the database
-          const debtAmountEUR = parseFloat(part.debt_amount);
-          const paidAmountEUR = parseFloat(part.amount_paid);
-          const remainingDebtEUR = debtAmountEUR - paidAmountEUR;
-          
-          if (remainingDebtEUR <= 0) {
-            // Mark part as paid if fully paid
-            await connection.query(`
-              UPDATE Skolos_dalys 
-              SET apmoketa = 1 
-              WHERE id_skolos_dalis = ?
-            `, [part.id_skolos_dalis]);
-            continue;
-          }
-          
-          // Calculate daily late fee in EUR (percentage of remaining debt)
-          const dailyFeeAmount = (remainingDebtEUR * lateFeePercentage) / 100;
-          
-          // Check if delspinigiai entry exists
-          const [existingFee] = await connection.query(`
-            SELECT 
-              id_delspinigiai,
-              apskaiciuota_suma,
-              pradzios_data
-            FROM delspinigiai
-            WHERE fk_id_skolos_dalis = ?
-            LIMIT 1
-          `, [part.id_skolos_dalis]);
-          
-          if (existingFee.length > 0) {
-            // Update existing late fee entry
-            const currentAccumulated = parseFloat(existingFee[0].apskaiciuota_suma);
-            const lastUpdateDate = new Date(existingFee[0].pradzios_data);
-            
-            // Only add fee if we haven't updated today
-            const todayStr = today.toISOString().slice(0, 10);
-            const lastUpdateStr = lastUpdateDate.toISOString().slice(0, 10);
-            
-            if (todayStr !== lastUpdateStr) {
-              const newAccumulated = currentAccumulated + dailyFeeAmount;
-              
-              await connection.query(`
-                UPDATE delspinigiai 
-                SET apskaiciuota_suma = ?,
-                    pradzios_data = CURDATE(),
-                    aktyvus = 1
-                WHERE id_delspinigiai = ?
-              `, [newAccumulated, existingFee[0].id_delspinigiai]);
-              
-              console.log(`Updated late fee for debt part ${part.id_skolos_dalis}: +${dailyFeeAmount.toFixed(2)} EUR (total: ${newAccumulated.toFixed(2)} EUR)`);
-            }
-          } else {
-            // Create new late fee entry
-            await connection.query(`
-              INSERT INTO delspinigiai (
-                fk_id_skolos_dalis,
-                dienos_proc,
-                pradzios_data,
-                pabaigos_data,
-                apskaiciuota_suma,
-                aktyvus
-              ) VALUES (?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), ?, 1)
-            `, [part.id_skolos_dalis, lateFeePercentage, dailyFeeAmount]);
-            
-            console.log(`Created new late fee for debt part ${part.id_skolos_dalis}: ${dailyFeeAmount.toFixed(2)} EUR`);
-          }
-          
-          // Update delspinigiai flag in Skolos_dalys
-          await connection.query(`
-            UPDATE Skolos_dalys 
-            SET delspinigiai = 1 
-            WHERE id_skolos_dalis = ?
-          `, [part.id_skolos_dalis]);
-        }
-      } catch (parseErr) {
-        console.error(`Error processing debt ${debt.id_skola}:`, parseErr);
+    let totalFeesCalculated = 0;
+    let entriesUpdated = 0;
+    
+    for (const entry of lateFeeEntries) {
+      const startDate = new Date(entry.start_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0);
+      
+      // Skip if start date is in the future
+      if (startDate > today) {
+        console.log('[LATE FEES] Skipping entry ' + entry.id_delspinigiai + ' - start date in future');
         continue;
       }
+      
+      // Calculate days elapsed since start
+      const daysElapsed = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+      
+      if (daysElapsed < 0) {
+        console.log('[LATE FEES] Skipping entry ' + entry.id_delspinigiai + ' - negative days');
+        continue;
+      }
+      
+      // Calculate remaining debt (original debt - what's been paid)
+      const originalDebt = parseFloat(entry.original_debt);
+      const amountPaid = parseFloat(entry.amount_paid);
+      const previouslyAccumulatedFee = parseFloat(entry.accumulated_fee);
+      
+      // The base for calculating late fees is the REMAINING unpaid debt
+      const remainingDebt = originalDebt - amountPaid;
+      
+      if (remainingDebt <= 0.01) {
+        // Debt is fully paid - deactivate late fee
+        await connection.query(
+          `UPDATE delspinigiai 
+           SET aktyvus = 0 
+           WHERE id_delspinigiai = ?`,
+          [entry.id_delspinigiai]
+        );
+        
+        console.log('[LATE FEES] Deactivated late fee ' + entry.id_delspinigiai + ' - debt fully paid');
+        continue;
+      }
+      
+      // Calculate daily late fee
+      const dailyPercentage = parseFloat(entry.daily_percentage);
+      const dailyFeeAmount = (remainingDebt * dailyPercentage) / 100;
+      
+      // Total accumulated fee should be: dailyFee * daysElapsed
+      const totalAccumulatedFee = dailyFeeAmount * daysElapsed;
+      
+      // Only update if there's a change
+      if (Math.abs(totalAccumulatedFee - previouslyAccumulatedFee) < 0.01) {
+        console.log('[LATE FEES] No change for entry ' + entry.id_delspinigiai);
+        continue;
+      }
+      
+      // Update delspinigiai table
+      await connection.query(
+        `UPDATE delspinigiai 
+         SET apskaiciuota_suma = ?
+         WHERE id_delspinigiai = ?`,
+        [totalAccumulatedFee, entry.id_delspinigiai]
+      );
+      
+      console.log('[LATE FEES] Entry ' + entry.id_delspinigiai + ':');
+      console.log('  - Debt: "' + entry.debt_title + '"');
+      console.log('  - Days elapsed: ' + daysElapsed);
+      console.log('  - Daily rate: ' + dailyPercentage + '%');
+      console.log('  - Remaining debt: ' + remainingDebt.toFixed(2) + ' EUR');
+      console.log('  - Daily fee: ' + dailyFeeAmount.toFixed(2) + ' EUR');
+      console.log('  - Total accumulated: ' + totalAccumulatedFee.toFixed(2) + ' EUR');
+      
+      // CRITICAL FIX: Add the accumulated late fee to the debt amount in Skolos_dalys
+      // The new total debt = original debt + accumulated late fees
+      const newTotalDebt = originalDebt + totalAccumulatedFee;
+      
+      await connection.query(
+        `UPDATE Skolos_dalys 
+         SET suma = ?
+         WHERE id_skolos_dalis = ?`,
+        [newTotalDebt, entry.fk_id_skolos_dalis]
+      );
+      
+      console.log('  - Updated Skolos_dalys: new total = ' + newTotalDebt.toFixed(2) + ' EUR (original: ' + originalDebt.toFixed(2) + ' + fee: ' + totalAccumulatedFee.toFixed(2) + ')');
+      
+      totalFeesCalculated += totalAccumulatedFee;
+      entriesUpdated++;
     }
     
     // Deactivate late fees for fully paid debts
-    await connection.query(`
-      UPDATE delspinigiai d
-      JOIN Skolos_dalys sd ON d.fk_id_skolos_dalis = sd.id_skolos_dalis
-      SET d.aktyvus = 0
-      WHERE sd.apmoketa = 1 AND d.aktyvus = 1
-    `);
+    const [deactivated] = await connection.query(
+      `UPDATE delspinigiai d
+       JOIN Skolos_dalys sd ON d.fk_id_skolos_dalis = sd.id_skolos_dalis
+       SET d.aktyvus = 0
+       WHERE sd.apmoketa = 1 AND d.aktyvus = 1`
+    );
+    
+    if (deactivated.affectedRows > 0) {
+      console.log('[LATE FEES] Deactivated ' + deactivated.affectedRows + ' late fee entries for paid debts');
+    }
     
     await connection.commit();
-    console.log(`[${new Date().toISOString()}] Late fee update completed successfully`);
+    
+    console.log('[' + new Date().toISOString() + '] Late fee update completed successfully');
+    console.log('[LATE FEES] Summary:');
+    console.log('  - Entries updated: ' + entriesUpdated);
+    console.log('  - Total fees calculated: ' + totalFeesCalculated.toFixed(2) + ' EUR');
     
   } catch (err) {
     await connection.rollback();
@@ -170,19 +160,29 @@ const updateLateFees = async () => {
 };
 
 /**
- * Schedule the cron job to run daily at 00:01
+ * Schedule the cron job to run daily at 03:06 (Vilnius time)
  */
 const scheduleLateFeeUpdates = () => {
-  cron.schedule('6 3 * * *', async () => {
+  // Run every day at 03:06 AM Vilnius time
+  cron.schedule('35 4 * * *', async () => {
     await updateLateFees();
   }, {
     timezone: "Europe/Vilnius"
   });
   
-  console.log('Late fee update cron job scheduled (runs daily at 00:01)');
+  console.log('✅ Late fee update cron job scheduled (runs daily at 03:06 Vilnius time)');
+};
+
+/**
+ * Manual trigger for testing
+ */
+const triggerManualUpdate = async () => {
+  console.log('🔧 Manually triggering late fee update...');
+  await updateLateFees();
 };
 
 module.exports = {
   scheduleLateFeeUpdates,
-  updateLateFees
+  updateLateFees,
+  triggerManualUpdate
 };
