@@ -377,6 +377,110 @@ router.post("/api/groups/:groupId/members", async (req, res) => {
   }
 });
 
+// PUT /api/groups/:groupId/members/:userId/role
+router.put("/api/groups/:groupId/members/:userId/role", async (req, res) => {
+  const groupId = Number(req.params.groupId)
+  const targetUserId = Number(req.params.userId)
+  const actorId = Number(req.header("x-user-id")) || null
+  const { role } = req.body || {} // expects 1|2|3
+
+  if (!actorId) return res.status(401).json({ message: "Trūksta x-user-id" })
+  if (!groupId || !targetUserId) return res.status(400).json({ message: "Blogi parametrai" })
+  if (![1, 2, 3].includes(Number(role))) return res.status(400).json({ message: "Neteisinga rolė" })
+
+  const ROLE_GUEST = 1
+  const ROLE_MEMBER = 2
+  const ROLE_ADMIN = 3
+  const ACTIVE = 1
+
+  try {
+    // 1) actor must be admin in this group
+    const [actorRows] = await db.query(
+      `SELECT role
+       FROM Grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = ?
+       LIMIT 1`,
+      [groupId, actorId, ACTIVE]
+    )
+    if (actorRows.length === 0) return res.status(403).json({ message: "Nesate grupės narys" })
+    if (Number(actorRows[0].role) !== ROLE_ADMIN) {
+      return res.status(403).json({ message: "Tik administratorius gali keisti roles" })
+    }
+
+    // 2) target must be active member
+    const [targetRows] = await db.query(
+      `SELECT role
+       FROM Grupes_nariai
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = ?
+       LIMIT 1`,
+      [groupId, targetUserId, ACTIVE]
+    )
+    if (targetRows.length === 0) return res.status(404).json({ message: "Narys nerastas" })
+
+    // 3) safety: prevent removing the last admin (unless we're transferring admin)
+    const [adminCountRows] = await db.query(
+      `SELECT COUNT(*) AS cnt
+       FROM Grupes_nariai
+       WHERE fk_id_grupe = ? AND role = ? AND nario_busena = ?`,
+      [groupId, ROLE_ADMIN, ACTIVE]
+    )
+    const adminCount = Number(adminCountRows[0]?.cnt || 0)
+
+    const targetCurrentRole = Number(targetRows[0].role)
+    const newRole = Number(role)
+
+    // If demoting an admin and NOT transferring admin to someone else -> block last admin demotion
+    if (targetCurrentRole === ROLE_ADMIN && newRole !== ROLE_ADMIN && adminCount <= 1) {
+      return res.status(400).json({ message: "Grupėje privalo likti bent vienas administratorius" })
+    }
+
+    // 4) If assigning admin to someone else => treat as "transfer":
+    //    target becomes admin, actor becomes member.
+    if (newRole === ROLE_ADMIN && targetUserId !== actorId) {
+      await db.query("START TRANSACTION")
+
+      await db.query(
+        `UPDATE grupes_nariai
+         SET role = ?
+         WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = ?`,
+        [ROLE_ADMIN, groupId, targetUserId, ACTIVE]
+      )
+
+      await db.query(
+        `UPDATE grupes
+        SET fk_id_vartotojas = ?
+        WHERE id_grupe = ?`,
+        [targetUserId, groupId]
+      )
+
+      await db.query(
+        `UPDATE grupes_nariai
+         SET role = ?
+         WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = ?`,
+        [ROLE_MEMBER, groupId, actorId, ACTIVE]
+      )
+
+      await db.query("COMMIT")
+      return res.json({ ok: true, transferred: true })
+    }
+
+    // 5) Normal role change (including changing someone to guest/member, or admin changing self role if you allow it)
+    await db.query(
+      `UPDATE Grupes_nariai
+       SET role = ?
+       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ? AND nario_busena = ?`,
+      [newRole, groupId, targetUserId, ACTIVE]
+    )
+
+    return res.json({ ok: true })
+  } catch (err) {
+    try { await db.query("ROLLBACK") } catch {}
+    console.error("Change role error:", err)
+    return res.status(500).json({ message: "Nepavyko pakeisti rolės" })
+  }
+})
+
+
 // ------------------------------
 // INVITES
 // ------------------------------
@@ -1101,7 +1205,11 @@ router.get("/api/grupes/:groupId/nariai/:userId/role", async (req, res) => {
     const [rows] = await db.query(
       `SELECT role, nario_busena
        FROM grupes_nariai
-       WHERE fk_id_grupe = ? AND fk_id_vartotojas = ?`,
+       WHERE fk_id_grupe = ?
+         AND fk_id_vartotojas = ?
+         AND nario_busena = 1
+       ORDER BY id_grupes_narys DESC
+       LIMIT 1`,
       [groupId, userId]
     )
 
