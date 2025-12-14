@@ -136,7 +136,7 @@ router.get('/api/groups-by-user/:userId', async (req, res) => {
 });
 
 
-// GET /api/groups/:id – pilna grupė su nariais
+// GET /api/groups/:id
 router.get('/api/groups/:id', async (req, res) => {
   const { id } = req.params
   
@@ -163,15 +163,17 @@ router.get('/api/groups/:id', async (req, res) => {
     // 2. Visi nariai
     const [memberRows] = await db.query(
       `SELECT 
-         v.id_vartotojas AS id,
-         v.vardas AS name,
-         v.el_pastas AS email,
-         gn.role
-       FROM Grupes_nariai gn
-       JOIN Vartotojai v ON gn.fk_id_vartotojas = v.id_vartotojas
-       WHERE gn.fk_id_grupe = ? AND gn.nario_busena = 1`,
+        v.id_vartotojas AS id,
+        v.vardas AS name,
+        v.el_pastas AS email,
+        v.avatar_url AS avatar_url,
+        gn.role
+      FROM Grupes_nariai gn
+      JOIN Vartotojai v ON gn.fk_id_vartotojas = v.id_vartotojas
+      WHERE gn.fk_id_grupe = ? AND gn.nario_busena = 1`,
       [id]
     )
+
 
     const mapRole = (roleInt) => {
       switch (roleInt) {
@@ -188,9 +190,11 @@ router.get('/api/groups/:id', async (req, res) => {
         id: m.id,
         name: m.name,
         email,
+        avatarUrl: m.avatar_url || null,
         role: mapRole(m.role),
       }
     })
+
 
     // 3. NAUJAS: Gauti visas skolos (išlaidas) šiai grupei
     const [debtRows] = await db.query(
